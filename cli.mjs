@@ -75,6 +75,7 @@ async function startServer() {
   const log = path.join(LOG_DIR, 'server.log');
   const child = spawn(process.execPath, [path.join(__dirname, 'server.mjs')], {
     detached: true,
+    windowsHide: true,
     stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
     env: { ...process.env, PATH: pathWithExtras() },
   });

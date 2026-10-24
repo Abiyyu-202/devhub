@@ -93,7 +93,7 @@ function stopTask(id) {
   const record = running.get(id);
   if (!record) return false;
   if (IS_WIN) {
-    spawn('taskkill', ['/PID', String(record.pid), '/T', '/F'], { stdio: 'ignore' });
+    spawn('taskkill', ['/PID', String(record.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
   } else {
     try { process.kill(-record.pid, 'SIGTERM'); } catch { try { process.kill(record.pid, 'SIGTERM'); } catch {} }
     setTimeout(() => {
@@ -376,7 +376,7 @@ async function handleApi(req, res, url) {
     }
 
     log.write(`\n[${new Date().toISOString()}] $ ${bin} ${args.join(' ')}\n`);
-    const child = spawn(bin, args, { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(bin, args, { detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     child.stdout.pipe(log);
     child.stderr.pipe(log);
     child.on('exit', (code) => log.write(`\n[${stamp()}] selesai (code ${code})\n`));

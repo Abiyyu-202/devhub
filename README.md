@@ -1,8 +1,10 @@
 # DevHub
 
-Toolbox developer lokal: kompres media, kelola project & aksi script, backup & restore database/project, pembersih disk (cleanup), git helper v2, API tester, download, background jobs queue, config editor, serta split `tmux` dengan `agy`, `opencode`, atau AI pilihan — semua dari satu dashboard web di `http://127.0.0.1:7070` atau via jaringan lokal (LAN).
+Toolbox developer lokal: dashboard pusat kontrol, kompres media, kelola project & aksi script, backup & restore database/project, pembersih disk (cleanup), git helper v2, API tester, download, background jobs queue, config editor, serta split `tmux` dengan `agy`, `opencode`, atau AI pilihan — semua dari satu dashboard web di `http://127.0.0.1:7070` atau via jaringan lokal (LAN).
 
 Berjalan native di **macOS, Linux, dan Windows** dengan **Node.js murni tanpa dependency npm**.
+
+![DevHub Dashboard Preview](assets/dashboard.png)
 
 ---
 
@@ -10,6 +12,7 @@ Berjalan native di **macOS, Linux, dan Windows** dengan **Node.js murni tanpa de
 
 | Menu | Fungsi |
 |---|---|
+| **Dashboard** | Pusat kontrol utama: ringkasan metrik (project, layanan, storage disk, LAN), kontrol cepat dev server, pintasan aksi developer, serta status git & sistem. |
 | **Kompres Media** | Foto, video, audio. macOS pakai `sips` + `avconvert` bawaan; Linux/Windows pakai `ffmpeg`. Upload via browser atau proses file lokal dengan antrian background. |
 | **Tugas & Project** | Scan project otomatis (`package.json`, `composer.json`, `index.php`, `artisan`, `manage.py`, `index.html`) + tugas manual. Run/stop dev server dan pantau log realtime. |
 | **Aksi Project** | Jalankan skrip per project langsung dari UI atau CLI (`npm run test/build/lint`, `php artisan migrate/seed`, `composer install`). |

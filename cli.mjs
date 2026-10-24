@@ -15,6 +15,7 @@ import {
 } from './lib/lib.mjs';
 import { openTarget, pidsOnPort, killProcess, spawnShell, pathWithExtras } from './lib/platform.mjs';
 import { autostartStatus, enableAutostart, disableAutostart } from './lib/autostart.mjs';
+import { aiKeys, resolveAi, detectAiTools, installedAiTools, installHint } from './lib/ai.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const C = {
@@ -121,7 +122,7 @@ async function taskList() {
   return mergedTasks(cfg);
 }
 
-async function pickTask(query) {
+async function pickTask(query, { alwaysPrompt = false } = {}) {
   const tasks = await taskList();
   if (!tasks.length) fail('Belum ada project. Taruh project di folder scan atau tambah lewat dashboard.');
   if (query) {
@@ -130,7 +131,7 @@ async function pickTask(query) {
     if (match) return match;
     fail(`Tugas "${query}" tidak ditemukan`);
   }
-  if (tasks.length === 1) return tasks[0];
+  if (!alwaysPrompt && tasks.length === 1) return tasks[0];
 
   const fzf = await which('fzf');
   if (fzf) {
@@ -177,28 +178,59 @@ async function cmdRun(query) {
   if (task.port) console.log(`  ${dim('buka:')} http://127.0.0.1:${task.port}`);
 }
 
-// ---------------------------------------------------------------- agy
+// ---------------------------------------------------------------- AI splits
 
-async function cmdAgy(query) {
-  const task = await pickTask(query);
-  if (!task) return;
-
+async function requireTmux() {
   if (IS_WIN) {
-    console.log(`${c(C.yellow, '⚠')} \`devhub agy\` butuh tmux, yang tidak tersedia native di Windows.`);
+    console.log(`${c(C.yellow, '⚠')} Split tmux tidak tersedia native di Windows.`);
     console.log(`  Pakai ${c(C.cyan, 'WSL')} lalu jalankan DevHub dari distro Linux.`);
-    return;
+    return null;
   }
-
   const tmux = await which('tmux');
   if (!tmux) {
     console.log(`${c(C.yellow, '⚠')} tmux belum terpasang.`);
     console.log(`  macOS: ${c(C.cyan, 'brew install tmux')}   Linux: ${c(C.cyan, 'sudo apt install tmux')}`);
-    return;
+    return null;
   }
-  const agy = await which('agy');
-  if (!agy) console.log(`${c(C.yellow, '⚠')} agy tidak ditemukan di PATH — pane kanan akan error.`);
+  return tmux;
+}
 
-  const session = `devhub-${slugify(task.name)}`;
+async function pickAi(preselect) {
+  if (preselect) {
+    const ai = await resolveAi(preselect);
+    if (!ai) fail(`AI "${preselect}" tidak dikenal. Pilihan: ${aiKeys().join(', ')}`);
+    if (!ai.installed) fail(`${ai.label} tidak ditemukan di PATH. Install: ${installHint(ai)}`);
+    return ai;
+  }
+
+  const installed = await installedAiTools();
+  if (!installed.length) {
+    fail(`Tidak ada AI CLI terdeteksi. Install salah satu: ${aiKeys().join(', ')}`);
+  }
+  if (installed.length === 1) {
+    console.log(`${c(C.dim, `AI terdeteksi: ${installed[0].label}`)}`);
+    return installed[0];
+  }
+
+  return choose('Pilih AI', installed.map((tool) => ({
+    label: tool.label,
+    hint: tool.binPath,
+    value: tool,
+  })));
+}
+
+async function cmdAiList() {
+  const tools = await detectAiTools();
+  header('AI CLI');
+  for (const tool of tools) {
+    const mark = tool.installed ? c(C.green, '●') : c(C.red, '○');
+    console.log(`  ${mark} ${String(tool.key).padEnd(14)} ${dim(tool.installed ? tool.binPath : `belum terpasang · ${tool.install}`)}`);
+  }
+  console.log(`\n  ${dim('pakai:')} devhub ai [project] [--ai=<key>]`);
+}
+
+function openSplit(tmux, task, ai) {
+  const session = `devhub-${slugify(task.name)}-${ai.key}`;
   const exists = spawnSync(tmux, ['has-session', '-t', session], { stdio: 'ignore' }).status === 0;
 
   if (exists) {
@@ -216,13 +248,72 @@ async function cmdAgy(query) {
   run(['send-keys', '-t', `${session}:0.0`, `cd ${JSON.stringify(task.path)} && ${task.command || shell}`, 'Enter']);
 
   run(['split-window', '-h', '-t', session, '-c', task.path]);
-  run(['select-pane', '-t', `${session}:0.1`, '-T', 'agy']);
-  const agyCommand = agy ? `exec ${JSON.stringify(agy)}` : 'echo "agy tidak ditemukan di PATH"';
-  run(['send-keys', '-t', `${session}:0.1`, agyCommand, 'Enter']);
+  run(['select-pane', '-t', `${session}:0.1`, '-T', ai.key]);
+  const aiCommand = ai.binPath
+    ? `exec ${JSON.stringify(ai.binPath)}`
+    : `echo ${JSON.stringify(`${ai.label} tidak ditemukan di PATH`)}; exec ${shell}`;
+  run(['send-keys', '-t', `${session}:0.1`, aiCommand, 'Enter']);
   run(['select-pane', '-t', `${session}:0.0`]);
 
-  console.log(`${c(C.green, '✔')} tmux ${c(C.cyan, session)} — kiri: dev server, kanan: agy`);
+  console.log(`${c(C.green, '✔')} tmux ${c(C.cyan, session)} — kiri: dev server, kanan: ${ai.key}`);
   spawnSync(tmux, ['attach', '-t', session], { stdio: 'inherit' });
+}
+
+async function cmdPair(query, aiKey) {
+  const tmux = await requireTmux();
+  if (!tmux) return;
+
+  const ai = await resolveAi(aiKey);
+  if (!ai) fail(`AI "${aiKey}" tidak dikenal`);
+  if (!ai.installed) {
+    console.log(`${c(C.yellow, '⚠')} ${ai.label} tidak ditemukan di PATH.`);
+    console.log(`  Install: ${c(C.cyan, installHint(ai))}`);
+  }
+
+  const task = await pickTask(query, { alwaysPrompt: true });
+  if (!task) return;
+
+  console.log(`${c(C.dim, 'project:')} ${task.name}  ${dim(`$ ${task.command || '-'}`)}`);
+  openSplit(tmux, task, ai);
+}
+
+async function cmdAgy(query) {
+  return cmdPair(query, 'agy');
+}
+
+async function cmdOpc(query) {
+  return cmdPair(query, 'opencode');
+}
+
+async function cmdAi(args) {
+  if (args.includes('--list')) return cmdAiList();
+
+  let preselect = null;
+  const positional = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg.startsWith('--ai=')) {
+      preselect = arg.slice('--ai='.length) || null;
+    } else if (arg === '--ai') {
+      preselect = args[i + 1] || null;
+      i += 1;
+    } else if (!arg.startsWith('--')) {
+      positional.push(arg);
+    }
+  }
+  const query = positional[0] || null;
+
+  const tmux = await requireTmux();
+  if (!tmux) return;
+
+  const task = await pickTask(query, { alwaysPrompt: true });
+  if (!task) return;
+
+  const ai = await pickAi(preselect);
+  if (!ai) return;
+
+  console.log(`${c(C.dim, 'project:')} ${task.name}  ${dim(`$ ${task.command || '-'}`)}`);
+  openSplit(tmux, task, ai);
 }
 
 // ---------------------------------------------------------------- compress
@@ -392,7 +483,9 @@ async function menu() {
     { label: 'Buka dashboard', hint: 'http://127.0.0.1:7070', value: 'dashboard' },
     { label: 'Kompres foto/video', hint: 'path lokal', value: 'compress' },
     { label: 'Jalankan project', hint: 'dev server', value: 'run' },
-    { label: 'devhub agy', hint: 'tmux split: dev + agy', value: 'agy' },
+    { label: 'devhub agy', hint: 'pilih project → tmux: dev + agy', value: 'agy' },
+    { label: 'devhub opc', hint: 'pilih project → tmux: dev + opencode', value: 'opc' },
+    { label: 'devhub ai', hint: 'pilih project + AI', value: 'ai' },
     { label: 'Port & service', hint: 'lihat / kill', value: 'ports' },
     { label: 'Git status', hint: 'project aktif', value: 'git' },
     { label: 'Download', hint: 'video / audio / file', value: 'download' },
@@ -407,6 +500,8 @@ async function menu() {
   }
   if (choice === 'run') return cmdRun();
   if (choice === 'agy') return cmdAgy();
+  if (choice === 'opc') return cmdOpc();
+  if (choice === 'ai') return cmdAi([]);
   if (choice === 'ports') return cmdPorts([]);
   if (choice === 'git') {
     const task = await pickTask();
@@ -462,6 +557,13 @@ switch (command) {
   case 'agy':
     await cmdAgy(rest[0]);
     break;
+  case 'opc':
+  case 'opencode':
+    await cmdOpc(rest[0]);
+    break;
+  case 'ai':
+    await cmdAi(rest);
+    break;
   case 'compress':
     await cmdCompress(rest);
     break;
@@ -495,7 +597,10 @@ switch (command) {
   devhub dashboard       nyalakan + buka browser
   devhub tasks           daftar project
   devhub run [nama]      jalankan project
-  devhub agy [nama]      tmux split: dev server + agy
+  devhub agy [nama]      pilih project → tmux: dev server + agy
+  devhub opc [nama]      pilih project → tmux: dev server + opencode
+  devhub ai [nama]       pilih project + AI (agy/opencode/claude/…)
+  devhub ai --list       daftar AI CLI yang terdeteksi
   devhub compress <f>    kompres foto/video
   devhub ports [kill id] lihat / matikan port
   devhub git [path] ...  status|pull|push|commit

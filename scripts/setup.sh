@@ -161,6 +161,6 @@ Selesai.
   Dashboard : node "$ROOT/cli.mjs" dashboard
   Autostart : devhub autostart on
   Status    : devhub status
-  agy split : devhub agy   (butuh tmux + agy)
+  agy split : devhub agy / opc / ai   (butuh tmux)
 
 EOF

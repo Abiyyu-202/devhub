@@ -1,6 +1,6 @@
 # DevHub
 
-Toolbox developer lokal: kompres media, kelola project, port, git, download, plus split `tmux` + `agy` — semua dari satu dashboard web di `http://127.0.0.1:7070`.
+Toolbox developer lokal: kompres media, kelola project, port, git, download, plus split `tmux` dengan `agy`, `opencode`, atau AI pilihan — semua dari satu dashboard web di `http://127.0.0.1:7070`.
 
 Berjalan native di **macOS, Linux, dan Windows** dengan **Node.js murni tanpa dependency npm**.
 
@@ -18,7 +18,7 @@ Berjalan native di **macOS, Linux, dan Windows** dengan **Node.js murni tanpa de
 
 - **Node.js 20+** (wajib)
 - **git** dan **curl** (disarankan)
-- **tmux** untuk `devhub agy` (macOS/Linux; Windows via WSL)
+- **tmux** untuk split AI `devhub agy` / `opc` / `ai` (macOS/Linux; Windows via WSL)
 - **fzf** opsional — pencarian project yang lebih nyaman
 - **ffmpeg** untuk kompresi di Linux/Windows (macOS tidak perlu)
 - **yt-dlp** opsional untuk download dari situs streaming
@@ -81,7 +81,10 @@ devhub serve                # foreground di http://127.0.0.1:7070
 devhub dashboard            # nyalakan + buka browser
 devhub tasks                # daftar project terdeteksi
 devhub run "Nama Project"   # jalankan dev server project
-devhub agy "Nama Project"   # tmux split: kiri dev server, kanan agy
+devhub agy "Nama Project"   # pilih project → tmux: dev server + agy
+devhub opc "Nama Project"   # pilih project → tmux: dev server + opencode
+devhub ai "Nama Project"    # pilih project + AI apa saja
+devhub ai --list            # daftar AI CLI yang terdeteksi
 devhub compress foto.jpg --quality=70 --max=1600
 devhub compress video.mov --preset=720p
 devhub ports                # lihat port yang listen
@@ -94,23 +97,33 @@ devhub status               # status layanan + server
 devhub autostart on|off|status
 ```
 
-## `devhub agy`
+## Split AI: `agy`, `opc`, `ai`
 
-Memilih project (pakai `fzf` kalau ada, kalau tidak menu bernomor), lalu membuat sesi tmux:
+Ketiganya selalu menampilkan **pilihan project dulu** (walaupun projectnya cuma satu), baru setelah itu dev server dan AI dijalankan berdampingan:
 
 ```
 ┌───────────────────────────┬───────────────────────────┐
-│ dev · NamaProject         │ agy                       │
+│ dev · NamaProject         │ agy / opencode / AI       │
 │ $ npm run dev             │ $ agy                     │
 │                           │                           │
 └───────────────────────────┴───────────────────────────┘
 ```
 
+| Perintah | AI di pane kanan |
+|---|---|
+| `devhub agy [project]` | `agy` (Antigravity) |
+| `devhub opc [project]` | `opencode` |
+| `devhub ai [project]` | pilih dari AI yang terdeteksi |
+| `devhub ai --ai=claude [project]` | langsung pilih AI tertentu |
+| `devhub ai --list` | lihat semua AI dan status install-nya |
+
+`devhub ai` mendeteksi AI CLI yang ada di `PATH`: `agy`, `opencode`, `claude`, `codex`, `gemini`, `aider`, `cursor-agent`, `copilot`, `qwen`, `crush`, `goose`, `amp`. Yang belum terpasang tidak ditampilkan di menu pilihan (tapi tetap terlihat di `--list`).
+
 - macOS: `brew install tmux`
 - Debian/Ubuntu: `sudo apt install tmux`
 - Windows: jalankan DevHub dari **WSL**, karena tmux tidak tersedia native.
 
-`agy` diambil dari `PATH` (termasuk `~/.local/bin`). Kalau belum login, pane kanan akan menampilkan instruksi login dari `agy` itu sendiri.
+Nama sesi tmux: `devhub-<project>-<ai>`, jadi sesi `agy` dan `opencode` untuk project yang sama tidak saling menimpa. Kalau sesi sudah ada, DevHub langsung attach. Kalau AI belum login, pane kanan akan menampilkan instruksi login dari CLI masing-masing.
 
 ## Konfigurasi
 

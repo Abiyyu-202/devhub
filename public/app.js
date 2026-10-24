@@ -2,7 +2,7 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 const state = {
-  view: 'compress',
+  view: 'dashboard',
   files: [],
   tasks: [],
   ports: [],
@@ -27,6 +27,7 @@ const state = {
 };
 
 const VIEW_META = {
+  dashboard: ['Dashboard', 'Pusat kontrol lokal — status server, proyek, layanan, dan akses cepat.'],
   compress: ['Kompres Media', 'Foto & video — pakai sips/avconvert di macOS, ffmpeg di Linux/Windows.'],
   tasks: ['Tugas & Project', 'Project terdeteksi otomatis, plus tugas manual. Run/stop dan aksi project.'],
   backup: ['Backup & Restore', 'Arsip project + dump database. Restore selalu minta konfirmasi.'],
@@ -88,6 +89,7 @@ function switchView(view) {
   const [title, sub] = VIEW_META[view] || ['DevHub', ''];
   $('#viewTitle').textContent = title;
   $('#viewSub').textContent = sub;
+  if (view === 'dashboard') loadDashboard();
   if (view === 'tasks') loadTasks();
   if (view === 'backup') loadBackups();
   if (view === 'ports') loadPorts();
@@ -123,6 +125,7 @@ async function loadStatus() {
 
 async function refreshAll() {
   await loadStatus();
+  if (state.view === 'dashboard') await loadDashboard();
   if (state.view === 'tasks') await loadTasks();
   if (state.view === 'ports') await loadPorts();
   if (state.view === 'git') await loadGit();
@@ -131,6 +134,206 @@ async function refreshAll() {
   if (state.view === 'jobs') await loadJobs();
   if (state.view === 'config') await loadConfig();
   toast('Diperbarui');
+}
+
+// ------------------------------------------------------------ dashboard
+async function loadDashboard() {
+  try {
+    if (!state.status) await loadStatus();
+    if (!state.tasks.length) await loadTasks();
+    const data = state.status;
+    if (!data) return;
+
+    // 1. Metrics Overview
+    const tasks = state.tasks || [];
+    const runningCount = tasks.filter((t) => t.running).length;
+    if ($('#dbProjectsVal')) $('#dbProjectsVal').textContent = `${tasks.length} Project`;
+    if ($('#dbProjectsBadge')) {
+      $('#dbProjectsBadge').textContent = runningCount > 0 ? `${runningCount} jalan` : 'Semua mati';
+      $('#dbProjectsBadge').className = `mc-badge ${runningCount > 0 ? 'green' : ''}`;
+    }
+
+    const services = Array.isArray(data.services) ? data.services : [];
+    const runningServices = services.filter((s) => s.running).length;
+    if ($('#dbServicesVal')) $('#dbServicesVal').textContent = `${runningServices} / ${services.length} Aktif`;
+    if ($('#dbPortsVal')) $('#dbPortsVal').textContent = `${data.ports} port`;
+
+    const disk = data.system?.disk;
+    if (disk && $('#dbDiskVal')) {
+      $('#dbDiskVal').textContent = bytes(disk.free);
+      const usedPct = Math.round(((disk.total - disk.free) / disk.total) * 100);
+      const badge = $('#dbDiskBadge');
+      if (badge) {
+        if (disk.free < 3 * 1024 * 1024 * 1024) {
+          badge.textContent = `${usedPct}% (Kritis)`;
+          badge.className = 'mc-badge red';
+        } else if (disk.free < 10 * 1024 * 1024 * 1024) {
+          badge.textContent = `${usedPct}% (Kurang)`;
+          badge.className = 'mc-badge amber';
+        } else {
+          badge.textContent = `${usedPct}%`;
+          badge.className = 'mc-badge green';
+        }
+      }
+    }
+
+    if (state.lan && $('#dbLanBadge')) {
+      const isEnabled = state.lan.enabled && state.lan.addresses?.length;
+      $('#dbLanBadge').textContent = isEnabled ? 'ON' : 'OFF';
+      $('#dbLanBadge').className = `mc-badge ${isEnabled ? 'green' : ''}`;
+      if ($('#dbLanSub')) $('#dbLanSub').textContent = isEnabled ? `http://${state.lan.addresses[0]}:${state.lan.port}` : 'Khusus localhost';
+    }
+
+    // 2. Main Project Card (first task or BRMotor)
+    const primaryTask = tasks.find((t) => t.name.toLowerCase().includes('motor')) || tasks[0];
+    const projectBox = $('#dbProjectCardContent');
+    if (projectBox) {
+      if (!primaryTask) {
+        projectBox.innerHTML = '<div class="dim" style="padding:14px">Tidak ada project yang terdeteksi.</div>';
+      } else {
+        const isRunning = Boolean(primaryTask.running);
+        projectBox.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:12px;padding:4px 0;width:100%">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+              <div>
+                <div style="font-size:16px;font-weight:700;color:var(--text)">${esc(primaryTask.name)}</div>
+                <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px">${esc(primaryTask.path)}</div>
+              </div>
+              <span class="badge ${isRunning ? 'green' : ''}">${isRunning ? 'Sedang Berjalan' : 'Berhenti'}</span>
+            </div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:14px;font-family:var(--mono);font-size:11.5px;color:var(--muted);background:#111821;padding:10px 12px;border-radius:8px;border:1px solid var(--border-soft)">
+              <div><span class="dim">Command:</span> <code>${esc(primaryTask.command || '-')}</code></div>
+              <div><span class="dim">Port:</span> <code>${primaryTask.port ? `:${primaryTask.port}` : '-'}</code></div>
+              ${isRunning && primaryTask.running?.pid ? `<div><span class="dim">PID:</span> <code>${primaryTask.running.pid}</code></div>` : ''}
+            </div>
+
+            <div class="row" style="gap:8px">
+              ${isRunning
+                ? `<button class="btn danger" id="dbTaskStopBtn">Hentikan Server</button>
+                   ${primaryTask.port ? `<a href="http://localhost:${primaryTask.port}" target="_blank" class="btn primary">Buka Web (:${primaryTask.port})</a>` : ''}`
+                : `<button class="btn primary" id="dbTaskRunBtn">Jalankan Dev Server</button>`}
+              <button class="btn ghost" id="dbTaskActionsBtn">Aksi Project...</button>
+              <button class="btn ghost" id="dbTaskLogBtn">Lihat Log</button>
+            </div>
+          </div>
+        `;
+
+        $('#dbTaskRunBtn')?.addEventListener('click', async () => {
+          $('#dbTaskRunBtn').disabled = true;
+          try {
+            await api(`/api/tasks/${encodeURIComponent(primaryTask.id)}/run`, { method: 'POST' });
+            toast('Dev server dijalankan');
+            await loadTasks();
+            await loadDashboard();
+          } catch (e) {
+            toast(e.message, true);
+            $('#dbTaskRunBtn').disabled = false;
+          }
+        });
+
+        $('#dbTaskStopBtn')?.addEventListener('click', async () => {
+          $('#dbTaskStopBtn').disabled = true;
+          try {
+            await api(`/api/tasks/${encodeURIComponent(primaryTask.id)}/stop`, { method: 'POST' });
+            toast('Dev server dihentikan');
+            await loadTasks();
+            await loadDashboard();
+          } catch (e) {
+            toast(e.message, true);
+            $('#dbTaskStopBtn').disabled = false;
+          }
+        });
+
+        $('#dbTaskActionsBtn')?.addEventListener('click', () => openActionModal(primaryTask));
+        $('#dbTaskLogBtn')?.addEventListener('click', () => openLog(primaryTask.id, primaryTask.name));
+      }
+    }
+
+    // 3. Quick Actions phpMyAdmin link
+    const qaPma = $('#qaPhpMyAdmin');
+    if (qaPma) {
+      qaPma.onclick = () => {
+        const pma = services.find((s) => s.id.toLowerCase().includes('phpmyadmin'));
+        window.open(pma?.url || 'http://127.0.0.1:8080/', '_blank');
+      };
+    }
+
+    // 4. Services Table
+    const svcBox = $('#dbServicesList');
+    if (svcBox) {
+      svcBox.innerHTML = services.map((svc) => {
+        const isRun = Boolean(svc.running);
+        return `
+          <div class="st-row">
+            <div class="st-info">
+              <span class="dot ${isRun ? 'on' : 'off'}"></span>
+              <span class="st-name">${esc(svc.label)}</span>
+              <span class="st-port">${svc.url ? esc(svc.url) : (svc.port ? `:${svc.port}` : '')}</span>
+            </div>
+            <div class="row" style="gap:6px">
+              ${isRun && svc.canStop ? `<button class="btn tiny danger" data-db-svc="${esc(svc.id)}" data-action="stop">Stop</button>` : ''}
+              ${!isRun && svc.canStart ? `<button class="btn tiny primary" data-db-svc="${esc(svc.id)}" data-action="start">Start</button>` : ''}
+              ${svc.url ? `<a href="${esc(svc.url)}" target="_blank" class="btn tiny ghost">Buka</a>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      svcBox.querySelectorAll('[data-db-svc]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try {
+            await api('/api/services', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ id: btn.dataset.dbSvc, action: btn.dataset.action }),
+            });
+            toast(`Layanan ${btn.dataset.action === 'start' ? 'dinyalakan' : 'dimatikan'}`);
+            await loadStatus();
+            await loadDashboard();
+          } catch (e) {
+            toast(e.message, true);
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    // 5. Git Status & System Overview
+    const gitBox = $('#dbGitSysContent');
+    if (gitBox) {
+      const sys = data.system || {};
+      const loadStr = (sys.load || []).map((n) => n.toFixed(2)).join(', ');
+      let gitHtml = '';
+      if (primaryTask) {
+        try {
+          const g = await api(`/api/git?path=${encodeURIComponent(primaryTask.path)}`);
+          gitHtml = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:#111821;border-radius:8px;border:1px solid var(--border-soft);margin-bottom:10px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="badge ${g.clean ? 'green' : 'amber'}">${g.branch || 'main'}</span>
+                <span style="font-size:12px;color:var(--text)">${g.clean ? 'Working tree bersih' : `${g.files?.length || 0} file berubah`}</span>
+              </div>
+              <span style="font-family:var(--mono);font-size:11px;color:var(--dim)">↑${g.ahead || 0} ↓${g.behind || 0}</span>
+            </div>
+          `;
+        } catch {}
+      }
+
+      gitBox.innerHTML = `
+        ${gitHtml}
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:11.5px;font-family:var(--mono);color:var(--dim)">
+          <div style="display:flex;justify-content:space-between"><span>Sistem OS:</span> <code style="color:var(--text)">${esc(sys.platform || '-')}</code></div>
+          <div style="display:flex;justify-content:space-between"><span>Node.js:</span> <code style="color:var(--text)">${esc(sys.node || '-')}</code></div>
+          <div style="display:flex;justify-content:space-between"><span>CPU Load (1/5/15m):</span> <code style="color:var(--text)">${esc(loadStr)}</code></div>
+          <div style="display:flex;justify-content:space-between"><span>RAM Terpakai:</span> <code style="color:var(--text)">${bytes((sys.memory?.total || 0) - (sys.memory?.free || 0))} / ${bytes(sys.memory?.total || 0)}</code></div>
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error('Failed to load dashboard:', error);
+  }
 }
 
 // ------------------------------------------------------------ compress
@@ -1397,7 +1600,12 @@ $('#swCopyPw')?.addEventListener('click', () => {
   await loadTasks();
   await renderRightPanelLan();
   await loadOutputs();
+  await loadDashboard();
   startJobStream();
   setInterval(loadStatus, 6000);
-  setInterval(() => { if (state.view === 'tasks') loadTasks(); else renderRightPanelProjects(); }, 6000);
+  setInterval(() => {
+    if (state.view === 'tasks') loadTasks();
+    else if (state.view === 'dashboard') loadDashboard();
+    else renderRightPanelProjects();
+  }, 6000);
 })();

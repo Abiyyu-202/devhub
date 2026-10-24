@@ -19,7 +19,11 @@
     </div>
 
     <nav>
-      <button class="nav-btn active" data-view="compress">
+      <button class="nav-btn active" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-btn" data-view="compress">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
         <span>Kompres Media</span>
       </button>
@@ -72,8 +76,8 @@
   <main>
     <header class="topbar">
       <div>
-        <h1 id="viewTitle">Kompres Media</h1>
-        <p id="viewSub">Foto &amp; video — pakai tool bawaan OS atau ffmpeg.</p>
+        <h1 id="viewTitle">Dashboard</h1>
+        <p id="viewSub">Pusat kontrol lokal — status server, proyek, layanan, dan akses cepat.</p>
       </div>
       <div class="top-actions">
         <div class="host-info" id="hostInfo"></div>
@@ -83,8 +87,160 @@
       </div>
     </header>
 
+    <!-- ============================ DASHBOARD (OVERVIEW) -->
+    <section class="view active" id="view-dashboard">
+      <!-- Row 1: Metrics Overview (4 stats cards) -->
+      <div class="metrics-grid">
+        <div class="metric-card" onclick="switchView('tasks')">
+          <div class="mc-icon green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          </div>
+          <div class="mc-info">
+            <div class="mc-val" id="dbProjectsVal">-</div>
+            <div class="mc-label">Project Terdeteksi</div>
+          </div>
+          <span class="mc-badge green" id="dbProjectsBadge">...</span>
+        </div>
+
+        <div class="metric-card" onclick="switchView('ports')">
+          <div class="mc-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>
+          </div>
+          <div class="mc-info">
+            <div class="mc-val" id="dbServicesVal">-</div>
+            <div class="mc-label">Layanan Lokal</div>
+          </div>
+          <span class="mc-badge" id="dbPortsVal">- port</span>
+        </div>
+
+        <div class="metric-card" onclick="switchView('cleanup')">
+          <div class="mc-icon amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </div>
+          <div class="mc-info">
+            <div class="mc-val" id="dbDiskVal">-</div>
+            <div class="mc-label">Sisa Storage Disk</div>
+          </div>
+          <span class="mc-badge" id="dbDiskBadge">...</span>
+        </div>
+
+        <div class="metric-card" onclick="switchView('config')">
+          <div class="mc-icon purple">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
+          </div>
+          <div class="mc-info">
+            <div class="mc-val" id="dbLanVal">LAN Mode</div>
+            <div class="mc-label" id="dbLanSub">192.168.x.x:7070</div>
+          </div>
+          <span class="mc-badge green" id="dbLanBadge">ON</span>
+        </div>
+      </div>
+
+      <!-- Row 2: Grid 2 Columns: Main Projects + Quick Command Palette -->
+      <div class="grid-2" style="margin-top:16px">
+        <!-- Main Project Card -->
+        <div class="card" style="margin:0">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Project Utama</div>
+              <div class="card-sub">Kontrol dev server dan aksi cepat</div>
+            </div>
+            <button class="btn small ghost" onclick="switchView('tasks')">Semua Project</button>
+          </div>
+          <div id="dbProjectCardContent" style="min-height:100px;display:flex;align-items:center;justify-content:center">
+            <span class="dim">Memuat info project...</span>
+          </div>
+        </div>
+
+        <!-- Quick Actions & Shortcuts -->
+        <div class="card" style="margin:0">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Aksi Cepat</div>
+              <div class="card-sub">Pintasan fitur developer yang sering dipakai</div>
+            </div>
+          </div>
+          <div class="quick-actions-grid">
+            <button class="qa-btn" id="qaPhpMyAdmin">
+              <span class="qa-icon">🗄️</span>
+              <div class="qa-text">
+                <strong>phpMyAdmin</strong>
+                <span>Database GUI</span>
+              </div>
+            </button>
+            <button class="qa-btn" onclick="switchView('ai')">
+              <span class="qa-icon">🤖</span>
+              <div class="qa-text">
+                <strong>AI Split</strong>
+                <span>Dev server + AI CLI</span>
+              </div>
+            </button>
+            <button class="qa-btn" onclick="switchView('backup')">
+              <span class="qa-icon">📦</span>
+              <div class="qa-text">
+                <strong>Backup DB</strong>
+                <span>Dump MariaDB / project</span>
+              </div>
+            </button>
+            <button class="qa-btn" onclick="switchView('cleanup')">
+              <span class="qa-icon">🧹</span>
+              <div class="qa-text">
+                <strong>Cleanup Disk</strong>
+                <span>Pindai node_modules</span>
+              </div>
+            </button>
+            <button class="qa-btn" onclick="switchView('api')">
+              <span class="qa-icon">🧪</span>
+              <div class="qa-text">
+                <strong>API Tester</strong>
+                <span>Mini Postman lokal</span>
+              </div>
+            </button>
+            <button class="qa-btn" onclick="switchView('compress')">
+              <span class="qa-icon">🖼️</span>
+              <div class="qa-text">
+                <strong>Kompres Media</strong>
+                <span>Optimasi foto &amp; video</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: Services & Git Overview -->
+      <div class="grid-2" style="margin-top:16px">
+        <!-- Services Status -->
+        <div class="card" style="margin:0">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Layanan Lokal</div>
+              <div class="card-sub">Status service database &amp; web server</div>
+            </div>
+            <button class="btn small ghost" onclick="switchView('ports')">Kelola Port</button>
+          </div>
+          <div class="service-table" id="dbServicesList">
+            <span class="dim">Memuat status layanan...</span>
+          </div>
+        </div>
+
+        <!-- Git Status & System Overview -->
+        <div class="card" style="margin:0">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Status Git &amp; Sistem</div>
+              <div class="card-sub">Repo aktif dan performa mesin</div>
+            </div>
+            <button class="btn small ghost" onclick="switchView('git')">Buka Git</button>
+          </div>
+          <div id="dbGitSysContent">
+            <span class="dim">Memuat status git...</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ============================ COMPRESS -->
-    <section class="view active" id="view-compress">
+    <section class="view" id="view-compress">
       <div class="card">
         <div class="dropzone" id="dropzone">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5-5 5 5"/><path d="M12 5v12"/></svg>

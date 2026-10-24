@@ -1,0 +1,30 @@
+{
+  "name": "devhub",
+  "version": "1.1.0",
+  "description": "Local developer toolbox: media compression, project runner, ports, git, downloads, and a tmux + agy split view.",
+  "type": "module",
+  "bin": {
+    "devhub": "bin/devhub"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check lib/platform.mjs && node --check lib/lib.mjs && node --check lib/autostart.mjs && node --check server.mjs && node --check cli.mjs && node --check public/app.js",
+    "autostart": "node cli.mjs autostart on"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Abiyyu-202/devhub.git"
+  },
+  "keywords": [
+    "devtools",
+    "dashboard",
+    "media-compression",
+    "tmux",
+    "git",
+    "local-server"
+  ],
+  "license": "MIT"
+}

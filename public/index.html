@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DevHub</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230e151b'/><text x='16' y='22' font-size='16' font-family='monospace' fill='%233ddc97' text-anchor='middle'>D</text></svg>" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">D</div>
+      <div>
+        <div class="brand-title">DevHub</div>
+        <div class="brand-sub">local toolbox</div>
+      </div>
+    </div>
+
+    <nav>
+      <button class="nav-btn active" data-view="compress">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <span>Kompres Media</span>
+      </button>
+      <button class="nav-btn" data-view="tasks">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Tugas &amp; Project</span>
+      </button>
+      <button class="nav-btn" data-view="ports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>
+        <span>Server &amp; Port</span>
+      </button>
+      <button class="nav-btn" data-view="git">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="8" r="2.6"/><path d="M6 8.6v6.8M18 10.6c0 3.2-3 3.4-6 3.9"/></svg>
+        <span>Git Helper</span>
+      </button>
+      <button class="nav-btn" data-view="download">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>
+        <span>Downloader</span>
+      </button>
+    </nav>
+
+    <div class="side-status" id="sideStatus"></div>
+    <div class="side-foot">devhub v1.1 · cross-platform</div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div>
+        <h1 id="viewTitle">Kompres Media</h1>
+        <p id="viewSub">Foto &amp; video — pakai tool bawaan OS atau ffmpeg.</p>
+      </div>
+      <div class="top-actions">
+        <div class="host-info" id="hostInfo"></div>
+        <button class="icon-btn" id="refreshBtn" title="Muat ulang">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ============================ COMPRESS -->
+    <section class="view active" id="view-compress">
+      <div class="card">
+        <div class="dropzone" id="dropzone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5-5 5 5"/><path d="M12 5v12"/></svg>
+          <strong>Lempar file ke sini</strong>
+          <span>atau klik untuk pilih · JPG, PNG, HEIC, MP4, MOV, M4A · bisa banyak file</span>
+          <input type="file" id="fileInput" multiple hidden />
+        </div>
+        <div class="file-chips" id="fileChips"></div>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="field">
+            <label>Kualitas gambar <span class="range-val" id="qualityVal">75</span></label>
+            <input type="range" id="quality" min="20" max="95" value="75" />
+          </div>
+          <div class="field">
+            <label>Resolusi maksimum gambar</label>
+            <select class="input" id="maxDim">
+              <option value="1280">1280 px</option>
+              <option value="1920" selected>1920 px</option>
+              <option value="2560">2560 px</option>
+              <option value="3840">3840 px</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Preset video</label>
+            <select class="input" id="preset">
+              <option value="1080p" selected>1080p (H.264)</option>
+              <option value="720p">720p</option>
+              <option value="480p">480p</option>
+              <option value="4k">4K</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Opsi</label>
+            <label class="hint" style="display:flex;align-items:center;gap:8px;height:38px">
+              <input type="checkbox" id="keepFormat" /> Pertahankan format asli gambar (tanpa konversi JPEG)
+            </label>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:16px">
+          <button class="btn primary" id="compressBtn">Kompres sekarang</button>
+          <span class="hint" id="compressHint">Belum ada file dipilih.</span>
+        </div>
+
+        <div class="results" id="results"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Kompres dari path lokal</div>
+            <div class="card-sub">Untuk file besar tanpa upload lewat browser.</div>
+          </div>
+        </div>
+        <div class="row">
+          <input class="input" id="pathInput" style="flex:1;min-width:260px" placeholder="/Users/yure1x/Downloads/video.mp4, /Users/yure1x/Pictures/foto.jpg" />
+          <button class="btn" id="pathBtn">Kompres path</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ TASKS -->
+    <section class="view" id="view-tasks">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Daftar tugas</div>
+            <div class="card-sub">Project terdeteksi otomatis + tugas manual. Bisa run/stop langsung dari sini.</div>
+          </div>
+          <div class="row">
+            <button class="btn small" id="taskRefresh">Scan ulang</button>
+            <button class="btn small primary" id="showAddTask">+ Tugas</button>
+          </div>
+        </div>
+
+        <div id="addTaskForm" style="display:none;margin-bottom:16px">
+          <div class="grid-2">
+            <div class="field"><label>Nama</label><input class="input" id="taskName" placeholder="BR Motor" /></div>
+            <div class="field"><label>Path</label><input class="input" id="taskPath" placeholder="/Users/yure1x/BRMotor" /></div>
+            <div class="field"><label>Command</label><input class="input" id="taskCommand" placeholder="npm run dev (kosongkan untuk auto-deteksi)" /></div>
+            <div class="field"><label>Port</label><input class="input" id="taskPort" placeholder="3000" /></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn primary small" id="addTaskBtn">Simpan tugas</button>
+            <button class="btn ghost small" id="cancelAddTask">Batal</button>
+          </div>
+        </div>
+
+        <div class="task-grid" id="taskGrid"></div>
+      </div>
+    </section>
+
+    <!-- ============================ PORTS -->
+    <section class="view" id="view-ports">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Layanan lokal</div>
+            <div class="card-sub">Kontrol cepat service yang dipakai sehari-hari.</div>
+          </div>
+        </div>
+        <div class="row" id="serviceRow"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Port yang listen</div>
+            <div class="card-sub" id="portCount">-</div>
+          </div>
+          <input class="input" id="portFilter" style="width:190px" placeholder="Filter port / proses…" />
+        </div>
+        <table>
+          <thead><tr><th class="mono">Port</th><th>Proses</th><th class="mono">PID</th><th class="mono">Address</th><th></th></tr></thead>
+          <tbody id="portBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================ GIT -->
+    <section class="view" id="view-git">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Git helper</div>
+            <div class="card-sub">Status, commit, pull, push — tanpa buka terminal.</div>
+          </div>
+          <div class="row">
+            <select class="input" id="gitProject" style="width:260px"></select>
+            <button class="btn small" id="gitRefresh">Muat</button>
+          </div>
+        </div>
+
+        <div id="gitBody">
+          <div class="hint">Pilih project dulu.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ DOWNLOAD -->
+    <section class="view" id="view-download">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Downloader</div>
+            <div class="card-sub">yt-dlp kalau ada, fallback ke curl untuk file langsung.</div>
+          </div>
+        </div>
+        <div class="row">
+          <input class="input" id="dlUrl" style="flex:1;min-width:280px" placeholder="https://…" />
+          <select class="input" id="dlMode" style="width:150px">
+            <option value="video">Video</option>
+            <option value="audio">Audio (mp3)</option>
+            <option value="file">File langsung</option>
+          </select>
+          <button class="btn primary" id="dlBtn">Download</button>
+        </div>
+        <div class="hint" id="dlNote" style="margin-top:10px"></div>
+        <pre class="log-box" id="dlLog" style="margin-top:14px;min-height:120px">Belum ada download.</pre>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal hidden" id="modal">
+  <div class="modal-card">
+    <div class="card-head" style="margin:0">
+      <div>
+        <div class="card-title" id="modalTitle">Log</div>
+        <div class="card-sub" id="modalSub"></div>
+      </div>
+      <div class="row">
+        <button class="btn small" id="modalRefresh">Refresh</button>
+        <button class="btn small ghost" id="modalClose">Tutup</button>
+      </div>
+    </div>
+    <pre class="log-box" id="modalLog"></pre>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

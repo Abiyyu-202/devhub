@@ -121,7 +121,7 @@ devhub ports kill 1234                      # matikan proses berdasarkan PID
 devhub git [path] status|pull|push|commit   # operasi git
 devhub download "https://…" --audio        # unduh file/audio/video
 devhub config [show|path|edit]              # lihat atau edit file konfigurasi
-devhub lan [on|off|status]                  # aktifkan akses dashboard dari jaringan Wi-Fi lokal
+devhub lan [on [pw]|off|status|password <pw>] # kelola akses LAN & password token
 devhub status                               # status layanan + server background
 devhub autostart [on|off|status]            # konfigurasi autostart saat boot/login
 ```
@@ -157,10 +157,14 @@ Dukungan AI CLI: `agy`, `opencode`, `claude`, `codex`, `gemini`, `aider`, `curso
 Secara default, DevHub hanya bind ke `127.0.0.1` (localhost). Jika kamu ingin mengakses dashboard dari perangkat lain (misal HP atau laptop lain di Wi-Fi yang sama):
 
 ```bash
-devhub lan on       # mengaktifkan host 0.0.0.0 & menghasilkan access token
-devhub lan status   # melihat IP LAN, URL akses, dan token password
-devhub lan off      # mengembalikan bind ke localhost (127.0.0.1)
+devhub lan on                       # aktifkan host 0.0.0.0 (token otomatis atau yang sudah ada)
+devhub lan on "password_kamu"       # aktifkan host 0.0.0.0 dengan password custom
+devhub lan password "password_baru" # ganti password akses LAN kapan saja
+devhub lan status                   # lihat IP LAN, URL akses, dan password saat ini
+devhub lan off                      # matikan akses LAN, kembali ke localhost (127.0.0.1)
 ```
+
+Password juga bisa diganti langsung lewat menu **Config** di web dashboard pada kolom **LAN Password (Access Token)**.
 
 ### Mekanisme Keamanan:
 - **Akses Lokal (`localhost` / `127.0.0.1`)**: Tetap instan tanpa password.

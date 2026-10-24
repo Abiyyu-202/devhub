@@ -797,8 +797,31 @@ async function cmdLan(args) {
   const action = args[0] || 'status';
   const cfg = await loadConfig();
 
+  if (action === 'password' || action === 'token' || action === 'pass' || action === 'set') {
+    const token = String(args[1] || '').trim();
+    if (!token) fail('Pakai: devhub lan password <password-baru>');
+    await saveConfig({ accessToken: token });
+    header('DevHub LAN Password');
+    console.log(`  ${c(C.green, '✔')} Password LAN berhasil diubah!`);
+    console.log(`  ${dim('Password:')} ${c(C.cyan, token)}`);
+    const enabled = !isLoopbackHost(cfg.host);
+    if (!enabled) {
+      console.log(`\n  ${dim('Catatan: LAN mode saat ini OFF. Aktifkan dengan:')} ${c(C.cyan, 'devhub lan on')}`);
+    } else {
+      console.log(`\n  ${dim('Restart server…')}`);
+      try {
+        const result = await restartServer();
+        console.log(`  ${c(C.green, '✔')} Server aktif di ${c(C.cyan, `http://127.0.0.1:${result.port}`)}${result.via ? dim(` (${result.via})`) : ''}`);
+      } catch (error) {
+        console.log(`  ${c(C.yellow, '⚠')} Gagal restart: ${error.message}`);
+        console.log(`  ${dim('Coba manual:')} ${c(C.cyan, 'devhub restart')}`);
+      }
+    }
+    return;
+  }
+
   if (action === 'on' || action === 'enable' || action === 'start') {
-    const token = cfg.accessToken || makeToken();
+    const token = args[1] || cfg.accessToken || makeToken();
     await saveConfig({ host: '0.0.0.0', accessToken: token });
     header('DevHub LAN');
     console.log(`  ${c(C.green, '✔')} LAN mode ${c(C.bold, 'ON')} ${dim('· bind 0.0.0.0')}`);
@@ -842,18 +865,19 @@ async function cmdLan(args) {
     const enabled = !isLoopbackHost(cfg.host);
     header('DevHub LAN');
     console.log(`  Status    : ${enabled ? c(C.green, 'ON') : c(C.red, 'OFF')} ${dim(`· host ${cfg.host || '127.0.0.1'}`)}`);
-    console.log(`  Password  : ${cfg.accessToken ? c(C.cyan, maskToken(cfg.accessToken)) : dim('(belum ada)')}`);
+    console.log(`  Password  : ${cfg.accessToken ? c(C.cyan, cfg.accessToken) : dim('(belum ada)')}`);
     console.log(`  Lokal     : ${dim(`http://127.0.0.1:${cfg.port || 7070}`)} ${dim('(tanpa password)')}`);
     if (enabled) {
       const addresses = lanAddresses();
       for (const address of addresses) console.log(`  LAN       : ${c(C.cyan, `http://${address}:${cfg.port || 7070}`)}`);
       if (!addresses.length) console.log(`  LAN       : ${dim('tidak ada alamat terdeteksi')}`);
     }
-    console.log(`\n  ${dim('Ubah:')} devhub lan on|off`);
+    console.log(`\n  ${dim('Ubah status:')} devhub lan on [pw] | devhub lan off`);
+    console.log(`  ${dim('Ganti password:')} devhub lan password <password-baru>`);
     return;
   }
 
-  fail('Pakai: devhub lan [on|off|status]');
+  fail('Pakai: devhub lan [on [pw]|off|status|password <pw>]');
 }
 
 // ---------------------------------------------------------------- backup
@@ -1275,7 +1299,7 @@ switch (command) {
   devhub actions [nama]  jalankan migrate/test/build project
   devhub jobs [cancel <id>]  antrian job background
   devhub config [show|path|edit]  config DevHub
-  devhub lan [on|off|status]  akses dashboard dari perangkat lain (password)
+  devhub lan [on [pw]|off|status|password <pw>]  akses dashboard via LAN (password)
   devhub status          status layanan
   devhub autostart [on|off|status]  nyala otomatis saat login`);
 }

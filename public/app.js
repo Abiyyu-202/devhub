@@ -1143,6 +1143,7 @@ async function loadConfig() {
     $('#cfgMaxDim').value = cfg.image?.maxDim ?? 1920;
     $('#cfgPreset').value = cfg.video?.preset || '1080p';
     $('#cfgHost').value = cfg.host || '127.0.0.1';
+    $('#cfgToken').value = cfg.accessToken || '';
     $('#cfgScanRoots').value = (cfg.scanRoots || []).join('\n');
     $('#cfgServices').value = JSON.stringify(cfg.services || [], null, 2);
     $('#cfgBackupTargets').value = JSON.stringify(cfg.backup?.targets || [], null, 2);
@@ -1167,6 +1168,7 @@ async function saveConfig() {
   try { services = JSON.parse($('#cfgServices').value || '[]'); } catch { return toast('Services bukan JSON valid', true); }
   try { targets = JSON.parse($('#cfgBackupTargets').value || '[]'); } catch { return toast('Backup targets bukan JSON valid', true); }
   const scanRoots = $('#cfgScanRoots').value.split('\n').map((line) => line.trim()).filter(Boolean);
+  const token = ($('#cfgToken')?.value || '').trim();
   const patch = {
     port: Number($('#cfgPort').value),
     scanDepth: Number($('#cfgDepth').value),
@@ -1176,6 +1178,7 @@ async function saveConfig() {
     services,
     backup: { targets },
   };
+  if (token) patch.accessToken = token;
   try {
     await api('/api/config', {
       method: 'POST', headers: { 'content-type': 'application/json' },

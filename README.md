@@ -119,7 +119,7 @@ Config: `~/.config/devhub/config.json` (Linux/macOS) atau `%APPDATA%\devhub\conf
 ```json
 {
   "port": 7070,
-  "scanRoots": ["~/Projects", "~/Sites"],
+  "scanRoots": ["/Users/kamu/Projects", "/Users/kamu/Sites"],
   "scanDepth": 2,
   "image": { "quality": 75, "maxDim": 1920 },
   "video": { "preset": "1080p" },

@@ -77,6 +77,10 @@ Linux: kalau ingin tetap jalan setelah logout, aktifkan linger sekali saja: `sud
 devhub                      # menu interaktif
 devhub start                # nyalakan server di background
 devhub stop                 # matikan server background
+devhub restart              # restart server background
+devhub update               # pull update DevHub (tanpa restart)
+devhub update --restart     # pull + restart server
+devhub check                # cek dependency yang kurang
 devhub serve                # foreground di http://127.0.0.1:7070
 devhub dashboard            # nyalakan + buka browser
 devhub tasks                # daftar project terdeteksi
@@ -96,6 +100,16 @@ devhub download "https://…" --audio
 devhub status               # status layanan + server
 devhub autostart on|off|status
 ```
+
+## Update & maintenance
+
+```bash
+devhub check     # dependency apa saja yang kurang + perintah install
+devhub update    # pull update DevHub sendiri (fast-forward); batal kalau ada perubahan lokal
+devhub restart   # stop + start server background
+```
+
+`devhub update` hanya menarik update untuk repo DevHub, bukan project user. Default-nya tidak restart server; jalankan `devhub restart` setelahnya kalau perlu. Pakai `devhub update --restart` kalau ingin pull sekaligus restart.
 
 ## Split AI: `agy`, `opc`, `ai`
 

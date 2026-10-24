@@ -24,6 +24,7 @@ const C = {
 };
 const c = (color, text) => `${color}${text}${C.reset}`;
 const dim = (text) => c(C.dim, text);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function header(title) {
   console.log(`\n${c(C.green, '◆')} ${c(C.bold, title)}\n`);
@@ -114,6 +115,262 @@ async function cmdServe(args) {
     env: { ...process.env, PATH: pathWithExtras() },
   });
   child.on('exit', (code) => process.exit(code ?? 0));
+}
+
+// ---------------------------------------------------------------- maintenance
+
+function toolVersion(bin, args, pattern) {
+  const result = spawnSync(bin, args, {
+    encoding: 'utf8',
+    timeout: 5000,
+    windowsHide: true,
+    env: { ...process.env, PATH: pathWithExtras() },
+  });
+  if (result.error || result.status !== 0) return null;
+  const raw = `${result.stdout || ''}${result.stderr || ''}`.trim();
+  return raw.match(pattern)?.[1] || raw.split('\n')[0].trim() || null;
+}
+
+async function restartViaService(status) {
+  if (!status?.enabled) return null;
+  const env = { ...process.env, PATH: pathWithExtras() };
+  let result;
+  if (status.method === 'systemd') {
+    result = spawnSync('systemctl', ['--user', 'restart', 'devhub.service'], { encoding: 'utf8', env });
+  } else if (status.method === 'launchd') {
+    const uid = typeof process.getuid === 'function' ? process.getuid() : 501;
+    result = spawnSync('/bin/launchctl', ['kickstart', '-k', `gui/${uid}/local.devhub`], { encoding: 'utf8', env });
+  } else {
+    return null;
+  }
+  if (result.error || result.status !== 0) return null;
+  for (let i = 0; i < 40; i += 1) {
+    if (await serverAlive(status.port)) return status.port;
+    await wait(150);
+  }
+  return null;
+}
+
+async function restartServer() {
+  const cfg = await loadConfig();
+  const port = cfg.port || 7070;
+  const auto = await autostartStatus().catch(() => null);
+  if (auto?.enabled) {
+    const servicePort = await restartViaService(auto);
+    if (servicePort) return { port: servicePort, wasRunning: auto.running, pids: [], via: auto.method };
+  }
+
+  const wasRunning = await serverAlive(port);
+  let pids = [];
+  if (wasRunning) {
+    pids = await pidsOnPort(port);
+    for (const pid of pids) {
+      try {
+        if (IS_WIN) await killProcess(pid);
+        else process.kill(pid, 'SIGTERM');
+      } catch {}
+    }
+    for (let i = 0; i < 20; i += 1) {
+      if (!(await serverAlive(port)) && !(await pidsOnPort(port)).length) break;
+      await wait(150);
+    }
+    for (const pid of await pidsOnPort(port)) {
+      try { await killProcess(pid, { force: true, tree: true }); } catch {}
+    }
+    for (let i = 0; i < 20 && (await pidsOnPort(port)).length; i += 1) {
+      await wait(150);
+    }
+    if ((await pidsOnPort(port)).length) {
+      throw new Error(`Gagal menghentikan server lama di port ${port}`);
+    }
+  }
+
+  return { port: await startServer(), wasRunning, pids, via: null };
+}
+
+async function cmdRestart() {
+  header('DevHub restart');
+  try {
+    const result = await restartServer();
+    if (result.via) {
+      console.log(`  ${c(C.green, '✔')} ${result.wasRunning ? 'Restart' : 'Start'} via ${result.via}`);
+    } else if (result.wasRunning) {
+      console.log(`  ${c(C.green, '✔')} Server lama dihentikan${result.pids.length ? ` ${dim(`(PID ${result.pids.join(', ')})`)}` : ''}`);
+    } else {
+      console.log(`  ${dim('Server belum jalan — dinyalakan.')}`);
+    }
+    console.log(`  ${c(C.green, '✔')} http://127.0.0.1:${result.port}`);
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
+async function cmdUpdate(args = []) {
+  const restart = args.includes('--restart');
+  header('DevHub update');
+
+  const git = await which('git');
+  if (!git) {
+    const hint = IS_WIN ? 'winget install Git.Git' : IS_MAC ? 'brew install git' : 'sudo apt install git';
+    fail(`git belum terpasang. Install dulu: ${hint}`);
+  }
+
+  const env = { ...process.env, PATH: pathWithExtras() };
+  const run = (gitArgs, options = {}) => spawnSync(git, ['-C', ROOT, ...gitArgs], {
+    encoding: 'utf8',
+    timeout: 120000,
+    windowsHide: true,
+    env,
+    ...options,
+  });
+
+  const inside = run(['rev-parse', '--is-inside-work-tree']);
+  if (inside.status !== 0 || inside.stdout.trim() !== 'true') {
+    fail(`Folder DevHub bukan git repository: ${ROOT}`);
+  }
+
+  const branch = (run(['rev-parse', '--abbrev-ref', 'HEAD']).stdout || '').trim() || 'HEAD';
+  const dirty = (run(['status', '--porcelain']).stdout || '')
+    .split('\n')
+    .filter((line) => line && !line.startsWith('??'));
+  if (dirty.length) {
+    console.error(`  ${c(C.yellow, '⚠')} Ada perubahan lokal yang belum di-commit:`);
+    for (const line of dirty.slice(0, 5)) console.error(`    ${dim(line)}`);
+    if (dirty.length > 5) console.error(`    ${dim(`… dan ${dirty.length - 5} file lain`)}`);
+    fail('Commit atau stash dulu sebelum update.');
+  }
+
+  const before = (run(['rev-parse', 'HEAD']).stdout || '').trim();
+  const beforeShort = before.slice(0, 7);
+  const cfg = await loadConfig();
+  const wasRunning = await serverAlive(cfg.port || 7070);
+  console.log(`  ${dim(`branch ${branch} · ${beforeShort}`)}`);
+  console.log(`  ${dim('Menarik update dari origin…')}`);
+
+  const pull = run(['pull', '--ff-only'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  if (pull.error) fail(`git pull gagal: ${pull.error.message}`);
+  if (pull.status !== 0) {
+    const detail = `${pull.stderr || ''}${pull.stdout || ''}`.trim();
+    fail(`git pull gagal${detail ? `:\n${detail}` : ''}`);
+  }
+
+  const after = (run(['rev-parse', 'HEAD']).stdout || '').trim();
+  if (after === before) {
+    console.log(`  ${c(C.green, '✔')} Sudah versi terbaru ${dim(beforeShort)}`);
+    return;
+  }
+
+  const afterShort = after.slice(0, 7);
+  const commits = (run(['log', '--oneline', '--no-decorate', `${before}..${after}`]).stdout || '')
+    .split('\n')
+    .filter(Boolean);
+  console.log(`  ${c(C.green, '✔')} Update ${dim(beforeShort)} → ${dim(afterShort)}`);
+  for (const line of commits.slice(0, 10)) console.log(`    ${line}`);
+  if (commits.length > 10) console.log(`    ${dim(`… dan ${commits.length - 10} commit lain`)}`);
+
+  if (!wasRunning) {
+    console.log(`\n  ${dim('Server tidak sedang jalan. Jalankan')} ${c(C.cyan, 'devhub start')} ${dim('untuk memakai versi baru.')}`);
+    return;
+  }
+  if (!restart) {
+    console.log(`\n  ${c(C.yellow, '⚠')} Server masih memakai kode lama — jalankan ${c(C.cyan, 'devhub restart')}`);
+    return;
+  }
+
+  console.log(`\n  ${dim('Restart server…')}`);
+  try {
+    const result = await restartServer();
+    console.log(`  ${c(C.green, '✔')} Server jalan lagi di ${c(C.cyan, `http://127.0.0.1:${result.port}`)}${result.via ? dim(` (${result.via})`) : ''}`);
+  } catch (error) {
+    console.log(`  ${c(C.yellow, '⚠')} Update berhasil, tapi restart gagal: ${error.message}`);
+    console.log(`  ${dim('Coba manual:')} ${c(C.cyan, 'devhub restart')}`);
+    process.exitCode = 1;
+  }
+}
+
+async function cmdCheck() {
+  header('DevHub check');
+
+  const nodeMajor = Number(process.versions.node.split('.')[0]);
+  const nodeOk = nodeMajor >= 20;
+  const deps = [
+    {
+      key: 'git', label: 'git', note: 'update & git helper',
+      args: ['--version'], pattern: /git version (\S+)/,
+      install: { win: 'winget install Git.Git', mac: 'brew install git', linux: 'sudo apt install git' },
+    },
+    {
+      key: 'curl', label: 'curl', note: 'downloader fallback',
+      args: ['--version'], pattern: /^curl (\S+)/,
+      install: { win: 'winget install curl.curl', mac: 'brew install curl', linux: 'sudo apt install curl' },
+    },
+    {
+      key: 'ffmpeg', label: 'ffmpeg', note: IS_MAC ? 'opsional (macOS pakai sips/avconvert)' : 'kompresi media',
+      args: ['-version'], pattern: /ffmpeg version (\S+)/,
+      install: { win: 'winget install Gyan.FFmpeg', mac: 'brew install ffmpeg', linux: 'sudo apt install ffmpeg' },
+    },
+    {
+      key: 'tmux', label: 'tmux', note: IS_WIN ? 'split AI via WSL' : 'split AI (agy/opc)',
+      args: ['-V'], pattern: /^tmux (\S+)/,
+      install: { win: 'pakai WSL — tmux tidak native di Windows', mac: 'brew install tmux', linux: 'sudo apt install tmux' },
+    },
+    {
+      key: 'fzf', label: 'fzf', note: 'pemilihan project',
+      args: ['--version'], pattern: /^(\S+)/,
+      install: { win: 'winget install junegunn.fzf', mac: 'brew install fzf', linux: 'sudo apt install fzf' },
+    },
+    {
+      key: 'yt-dlp', label: 'yt-dlp', note: 'download streaming',
+      args: ['--version'], pattern: /^(\S+)/,
+      install: { win: 'winget install yt-dlp.yt-dlp', mac: 'brew install yt-dlp', linux: 'python3 -m pip install --user yt-dlp' },
+    },
+  ];
+
+  const rows = [{
+    label: 'Node.js', installed: true, ok: nodeOk,
+    version: process.version, note: nodeOk ? '' : 'butuh Node 20+',
+  }];
+  for (const dep of deps) {
+    const binPath = await which(dep.key);
+    const installed = Boolean(binPath);
+    const version = installed ? toolVersion(binPath, dep.args, dep.pattern) : null;
+    rows.push({ ...dep, installed, ok: installed, version, binPath });
+  }
+
+  const mark = (row) => (row.installed && row.ok ? c(C.green, '●') : c(C.red, '○'));
+  for (const row of rows) {
+    const label = String(row.label).padEnd(12);
+    let detail;
+    if (!row.installed) detail = dim(row.note || 'tidak terpasang');
+    else if (row.version) detail = row.version;
+    else detail = dim(row.binPath || 'terpasang');
+    if (row.label === 'Node.js' && !row.ok) detail = `${row.version} ${c(C.red, '(butuh Node 20+)')}`;
+    console.log(`  ${mark(row)} ${label} ${detail}`);
+  }
+
+  const missing = rows.filter((row) => !row.installed);
+  if (missing.length) {
+    console.log(`\n  ${c(C.yellow, '⚠')} ${missing.length} dependency belum terpasang:`);
+    for (const row of missing) {
+      const hint = IS_WIN ? row.install.win : IS_MAC ? row.install.mac : row.install.linux;
+      console.log(`    ${String(row.label).padEnd(12)} ${c(C.cyan, hint)}`);
+    }
+    console.log(`\n  ${dim('DevHub tetap jalan; fitur yang membutuhkan dependency tersebut belum aktif.')}`);
+  } else if (nodeOk) {
+    console.log(`\n  ${c(C.green, '✔')} Semua dependency terpasang.`);
+  }
+
+  if (!nodeOk) {
+    const hint = IS_WIN ? 'winget install OpenJS.NodeJS.LTS' : IS_MAC ? 'brew install node' : 'sudo apt install nodejs npm';
+    console.log(`\n  ${c(C.red, '✖')} Node.js ${process.version} terlalu lama; butuh Node 20+.`);
+    console.log(`    ${c(C.cyan, hint)}`);
+    process.exitCode = 1;
+  }
+
+  const cfg = await loadConfig();
+  const port = cfg.port || 7070;
+  const alive = await serverAlive(port);
+  console.log(`\n  ${alive ? c(C.green, '●') : c(C.red, '○')} Server ${alive ? 'jalan' : 'mati'} ${dim(`http://127.0.0.1:${port}`)}`);
 }
 
 // ---------------------------------------------------------------- tasks
@@ -491,6 +748,9 @@ async function menu() {
     { label: 'Git status', hint: 'project aktif', value: 'git' },
     { label: 'Download', hint: 'video / audio / file', value: 'download' },
     { label: 'Autostart', hint: 'nyala otomatis saat login', value: 'autostart' },
+    { label: 'Cek dependency', hint: 'devhub check', value: 'check' },
+    { label: 'Update DevHub', hint: 'git pull', value: 'update' },
+    { label: 'Restart server', hint: 'stop + start', value: 'restart' },
   ]);
 
   if (!choice) return;
@@ -517,6 +777,9 @@ async function menu() {
     const status = await autostartStatus();
     return cmdAutostart([status.enabled ? 'off' : 'on']);
   }
+  if (choice === 'check') return cmdCheck();
+  if (choice === 'update') return cmdUpdate([]);
+  if (choice === 'restart') return cmdRestart();
 }
 
 async function cmdService(args) {
@@ -548,6 +811,15 @@ switch (command) {
     break;
   case 'stop':
     await stopServer();
+    break;
+  case 'restart':
+    await cmdRestart();
+    break;
+  case 'update':
+    await cmdUpdate(rest);
+    break;
+  case 'check':
+    await cmdCheck();
     break;
   case 'tasks':
     await cmdTasks();
@@ -594,6 +866,10 @@ switch (command) {
   devhub                 menu interaktif
   devhub start           nyalakan server di background
   devhub stop            matikan server background
+  devhub restart         restart server background
+  devhub update          pull update DevHub (tanpa restart)
+  devhub update --restart  pull + restart server
+  devhub check           cek dependency yang kurang
   devhub serve           jalankan server di foreground
   devhub dashboard       nyalakan + buka browser
   devhub tasks           daftar project

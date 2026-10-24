@@ -897,6 +897,44 @@ async function handleApi(req, res, url) {
     return json(res, 200, { ok: true });
   }
 
+  if (pathname === '/api/outputs' && method === 'GET') {
+    try {
+      fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+      const entries = await fsp.readdir(OUTPUT_DIR, { withFileTypes: true });
+      const files = [];
+      for (const entry of entries) {
+        if (!entry.isFile() || entry.name.startsWith('.')) continue;
+        const full = path.join(OUTPUT_DIR, entry.name);
+        try {
+          const stat = await fsp.stat(full);
+          files.push({
+            name: entry.name,
+            size: stat.size,
+            mtime: stat.mtimeMs,
+            url: `/files/${encodeURIComponent(entry.name)}`,
+            path: full,
+          });
+        } catch {}
+      }
+      files.sort((a, b) => b.mtime - a.mtime);
+      return json(res, 200, { files: files.slice(0, 20) });
+    } catch (error) {
+      return json(res, 500, { error: error.message });
+    }
+  }
+
+  if (pathname === '/api/outputs' && method === 'DELETE') {
+    const { name } = await readJsonBody(req);
+    if (!name) return json(res, 400, { error: 'Nama file wajib diisi' });
+    const safe = path.basename(name);
+    const target = path.join(OUTPUT_DIR, safe);
+    if (fs.existsSync(target)) {
+      await fsp.unlink(target);
+      return json(res, 200, { ok: true });
+    }
+    return json(res, 404, { error: 'File tidak ditemukan' });
+  }
+
   return json(res, 404, { error: 'Endpoint tidak ditemukan' });
 }
 

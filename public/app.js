@@ -23,6 +23,7 @@ const state = {
   actionTimer: null,
   ai: null,
   config: null,
+  outputs: [],
 };
 
 const VIEW_META = {
@@ -112,6 +113,7 @@ async function loadStatus() {
 
     const sys = data.system;
     $('#hostInfo').innerHTML = `<b>${esc(sys.hostname)}</b><br>${sys.projects} project · ${data.ports} port<br>${bytes(sys.memory.free)} free`;
+    renderRightPanelDisk(sys.disk);
 
     if (state.view === 'ports') renderServices();
   } catch (error) {
@@ -184,6 +186,7 @@ $('#compressBtn').addEventListener('click', async () => {
 
     const data = await api('/api/compress', { method: 'POST', body: form });
     renderResults(data.results);
+    loadOutputs();
     state.files = [];
     renderFileChips();
   } catch (error) {
@@ -256,6 +259,20 @@ function handleJobs(jobs) {
   }
   renderJobs();
 
+  const runningJob = jobs.find((j) => j.status === 'running');
+  const liveBox = $('#swLiveJob');
+  if (liveBox) {
+    if (runningJob) {
+      liveBox.classList.remove('hidden');
+      $('#swLiveJobLabel').textContent = runningJob.label || 'Memproses...';
+      const pct = runningJob.progress ?? 0;
+      $('#swLiveJobPct').textContent = `${pct}%`;
+      $('#swLiveJobBar').style.width = `${pct}%`;
+    } else {
+      liveBox.classList.add('hidden');
+    }
+  }
+
   for (const job of jobs) {
     if (job.id === state.compressJobId) {
       setProgress($('#compressProgress'), $('#compressProgressBar'), job.progress, job.message);
@@ -269,6 +286,7 @@ function handleJobs(jobs) {
     if (job.type === 'compress') {
       if (job.status === 'done') {
         renderResults(job.result?.results || []);
+        loadOutputs();
         toast('Kompres selesai');
         setTimeout(() => hideProgress($('#compressProgress')), 2500);
       } else if (job.status === 'error') toast(job.error || 'Kompres gagal', true);
@@ -356,6 +374,7 @@ async function loadTasks() {
   try {
     state.tasks = await api('/api/tasks');
     renderTasks();
+    renderRightPanelProjects();
     fillGitProjects();
     fillAiProjects();
   } catch (error) {
@@ -1197,12 +1216,188 @@ async function saveConfig() {
 $('#configSave').addEventListener('click', saveConfig);
 $('#configSave2').addEventListener('click', saveConfig);
 
+// ------------------------------------------------ companion panel
+async function loadOutputs() {
+  try {
+    const data = await api('/api/outputs');
+    state.outputs = data.files || [];
+    renderRightPanelOutputs();
+  } catch (error) {
+    console.error('Failed to load outputs:', error);
+  }
+}
+
+function renderRightPanelOutputs() {
+  const container = $('#swOutputsList');
+  if (!container) return;
+  const files = state.outputs || [];
+  if (!files.length) {
+    container.innerHTML = '<div class="dim" style="font-size:11.5px;padding:8px 0">Belum ada file di folder output.</div>';
+    return;
+  }
+  container.innerHTML = files.slice(0, 5).map((f) => `
+    <div class="recent-out-row">
+      <span class="recent-out-name" title="${esc(f.name)}">${esc(f.name)}</span>
+      <span class="recent-out-size">${bytes(f.size)}</span>
+      <a href="${esc(f.url)}" download class="icon-btn" title="Unduh file" style="width:22px;height:22px;border-radius:5px">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
+      </a>
+    </div>
+  `).join('');
+}
+
+function renderRightPanelDisk(disk) {
+  if (!disk) return;
+  const freeBytes = disk.free;
+  const totalBytes = disk.total;
+  const usedPct = Math.min(100, Math.max(0, Math.round(((totalBytes - freeBytes) / totalBytes) * 100)));
+  const bar = $('#swDiskBar');
+  const badge = $('#swDiskBadge');
+  const usage = $('#swDiskUsage');
+  if (!bar || !badge || !usage) return;
+
+  bar.style.width = `${usedPct}%`;
+  usage.textContent = `${bytes(freeBytes)} sisa · ${usedPct}%`;
+
+  if (freeBytes < 3 * 1024 * 1024 * 1024) { // < 3GB
+    bar.className = 'disk-meter-bar crit';
+    badge.className = 'badge red';
+    badge.textContent = 'Kritis';
+  } else if (freeBytes < 10 * 1024 * 1024 * 1024) { // < 10GB
+    bar.className = 'disk-meter-bar warn';
+    badge.className = 'badge amber';
+    badge.textContent = 'Peringatan';
+  } else {
+    bar.className = 'disk-meter-bar';
+    badge.className = 'badge green';
+    badge.textContent = 'Sehat';
+  }
+}
+
+async function renderRightPanelLan() {
+  try {
+    const [lan, cfg] = await Promise.all([
+      api('/api/lan'),
+      state.config ? Promise.resolve(state.config) : api('/api/config').catch(() => null),
+    ]);
+    state.lan = lan;
+    if (cfg) state.config = cfg;
+    const isEnabled = lan.enabled && lan.addresses.length > 0;
+    const statusBadge = $('#swLanStatus');
+    const urlText = $('#swLanUrl');
+    const pwText = $('#swLanPw');
+    const qrBox = $('#swQrBox');
+    if (!statusBadge || !urlText || !pwText || !qrBox) return;
+
+    const token = state.config?.accessToken || lan.token || 'brmotor123';
+
+    if (isEnabled) {
+      statusBadge.textContent = 'LAN ON';
+      statusBadge.className = 'badge green';
+      const addr = lan.addresses[0];
+      const lanUrl = `http://${addr}:${lan.port}`;
+      urlText.textContent = lanUrl;
+      pwText.textContent = token;
+
+      if (window.createQrSvg) {
+        qrBox.innerHTML = window.createQrSvg(lanUrl, { size: 80, margin: 1, radius: 4 });
+      }
+    } else {
+      statusBadge.textContent = 'LAN OFF';
+      statusBadge.className = 'badge';
+      urlText.textContent = `http://127.0.0.1:${lan.port}`;
+      pwText.textContent = '(khusus lokal)';
+      if (window.createQrSvg) {
+        qrBox.innerHTML = window.createQrSvg(`http://127.0.0.1:${lan.port}`, { size: 80, margin: 1, radius: 4 });
+      }
+    }
+  } catch (error) {
+    console.error('Failed to render LAN panel:', error);
+  }
+}
+
+function renderRightPanelProjects() {
+  const container = $('#swProjectsList');
+  if (!container) return;
+  const tasks = state.tasks || [];
+  if (!tasks.length) {
+    container.innerHTML = '<div class="dim" style="font-size:11.5px;padding:4px 0">Tidak ada project aktif.</div>';
+    return;
+  }
+  container.innerHTML = tasks.slice(0, 3).map((task) => {
+    const isRunning = Boolean(task.running);
+    return `
+      <div class="sw-project-row">
+        <div style="flex:1;min-width:0">
+          <div class="sw-pname">${esc(task.name)}</div>
+          <div class="sw-pport">${task.port ? `:${task.port}` : ''} ${isRunning ? '<span style="color:var(--accent)">● jalan</span>' : '<span style="color:var(--dim)">mati</span>'}</div>
+        </div>
+        <div style="display:flex;gap:4px">
+          ${isRunning
+            ? `<button class="btn tiny danger" data-sw-stop="${esc(task.id)}">Stop</button>
+               ${task.port ? `<a href="http://localhost:${task.port}" target="_blank" class="btn tiny ghost">Buka</a>` : ''}`
+            : `<button class="btn tiny primary" data-sw-run="${esc(task.id)}">Run</button>`}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('[data-sw-run]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        await api(`/api/tasks/${encodeURIComponent(btn.dataset.swRun)}/run`, { method: 'POST' });
+        toast('Project dijalankan');
+        await loadTasks();
+      } catch (e) {
+        toast(e.message, true);
+        btn.disabled = false;
+      }
+    });
+  });
+
+  container.querySelectorAll('[data-sw-stop]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        await api(`/api/tasks/${encodeURIComponent(btn.dataset.swStop)}/stop`, { method: 'POST' });
+        toast('Project dihentikan');
+        await loadTasks();
+      } catch (e) {
+        toast(e.message, true);
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+$('#swCleanBtn')?.addEventListener('click', () => switchView('cleanup'));
+$('#swGotoTasks')?.addEventListener('click', () => switchView('tasks'));
+$('#swRefreshOutputs')?.addEventListener('click', async () => {
+  await loadOutputs();
+  toast('Riwayat output diperbarui');
+});
+$('#swCopyUrl')?.addEventListener('click', () => {
+  const url = $('#swLanUrl')?.textContent || '';
+  if (url && url !== '-') {
+    navigator.clipboard.writeText(url).then(() => toast('URL LAN disalin!'));
+  }
+});
+$('#swCopyPw')?.addEventListener('click', () => {
+  const pw = $('#swLanPw')?.textContent || '';
+  if (pw && pw !== '-') {
+    navigator.clipboard.writeText(pw).then(() => toast('Password LAN disalin!'));
+  }
+});
+
 // ------------------------------------------------------------ init
 (async function init() {
   renderFileChips();
   await loadStatus();
   await loadTasks();
+  await renderRightPanelLan();
+  await loadOutputs();
   startJobStream();
   setInterval(loadStatus, 6000);
-  setInterval(() => { if (state.view === 'tasks') loadTasks(); }, 6000);
+  setInterval(() => { if (state.view === 'tasks') loadTasks(); else renderRightPanelProjects(); }, 6000);
 })();

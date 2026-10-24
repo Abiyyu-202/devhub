@@ -419,6 +419,75 @@
       </div>
     </section>
   </main>
+
+  <aside class="panel-right" id="panelRight">
+    <!-- Storage & Health -->
+    <div class="sw-card" id="swDiskCard">
+      <div class="sw-head">
+        <span class="sw-title">Kapasitas Disk</span>
+        <span class="badge" id="swDiskBadge">...</span>
+      </div>
+      <div class="disk-meter">
+        <div class="disk-meter-bar" id="swDiskBar"></div>
+      </div>
+      <div class="sw-meta">
+        <span id="swDiskUsage">-</span>
+        <button class="btn tiny ghost" id="swCleanBtn">Bersihkan Disk</button>
+      </div>
+    </div>
+
+    <!-- Akses HP (LAN & QR Code) -->
+    <div class="sw-card" id="swLanCard">
+      <div class="sw-head">
+        <span class="sw-title">Akses dari HP</span>
+        <span class="badge green" id="swLanStatus">LAN ON</span>
+      </div>
+      <div class="qr-container">
+        <div class="qr-box" id="swQrBox" title="Arahkan kamera HP ke sini"></div>
+        <div class="qr-meta">
+          <div class="qr-url" id="swLanUrl">-</div>
+          <div class="qr-pw-row">
+            <span class="dim">Password:</span>
+            <code class="qr-pw" id="swLanPw">-</code>
+          </div>
+          <div class="row" style="gap:6px;margin-top:6px">
+            <button class="btn tiny" id="swCopyUrl">Salin URL</button>
+            <button class="btn tiny" id="swCopyPw">Salin PW</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Proyek Aktif Controller -->
+    <div class="sw-card" id="swProjectCard">
+      <div class="sw-head">
+        <span class="sw-title">Proyek Cepat</span>
+        <button class="btn tiny ghost" id="swGotoTasks">Semua</button>
+      </div>
+      <div id="swProjectsList" class="sw-projects-list"></div>
+    </div>
+
+    <!-- Riwayat & Antrian Kompresi -->
+    <div class="sw-card" id="swOutputsCard">
+      <div class="sw-head">
+        <span class="sw-title">Hasil Kompresi</span>
+        <button class="btn tiny ghost" id="swRefreshOutputs">Refresh</button>
+      </div>
+      <div class="sw-live-job hidden" id="swLiveJob">
+        <div class="sw-live-head">
+          <span class="dot on"></span>
+          <span class="sw-live-label" id="swLiveJobLabel">Proses...</span>
+          <span class="sw-live-pct" id="swLiveJobPct">0%</span>
+        </div>
+        <div class="progress" style="margin-top:6px;height:5px">
+          <div class="progress-bar" id="swLiveJobBar"></div>
+        </div>
+      </div>
+      <div class="recent-outputs" id="swOutputsList">
+        <div class="dim" style="font-size:11.5px;padding:8px 0">Belum ada file di folder output.</div>
+      </div>
+    </div>
+  </aside>
 </div>
 
 <!-- action modal -->
@@ -457,6 +526,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/qr.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

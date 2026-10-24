@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check lib/platform.mjs && node --check lib/lib.mjs && node --check lib/autostart.mjs && node --check lib/ai.mjs && node --check lib/lan.mjs && node --check lib/actions.mjs && node --check lib/gitx.mjs && node --check lib/cleanup.mjs && node --check lib/backup.mjs && node --check lib/jobs.mjs && node --check lib/split.mjs && node --check lib/configx.mjs && node --check server.mjs && node --check cli.mjs && node --check public/app.js",
+    "check": "node --check lib/platform.mjs && node --check lib/lib.mjs && node --check lib/autostart.mjs && node --check lib/ai.mjs && node --check lib/lan.mjs && node --check lib/actions.mjs && node --check lib/gitx.mjs && node --check lib/cleanup.mjs && node --check lib/backup.mjs && node --check lib/jobs.mjs && node --check lib/split.mjs && node --check lib/configx.mjs && node --check server.mjs && node --check cli.mjs && node --check public/qr.js && node --check public/app.js",
     "autostart": "node cli.mjs autostart on"
   },
   "engines": {

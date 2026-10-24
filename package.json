@@ -1,14 +1,14 @@
 {
   "name": "devhub",
-  "version": "1.3.0",
-  "description": "Local developer toolbox: media compression, project runner, ports, git, downloads, and a tmux + agy split view.",
+  "version": "2.0.0",
+  "description": "Local developer toolbox: media compression, project runner/actions, backups, cleanup, git, API tester, AI tmux launcher, ports, downloads, and LAN mode.",
   "type": "module",
   "bin": {
     "devhub": "bin/devhub"
   },
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check lib/platform.mjs && node --check lib/lib.mjs && node --check lib/autostart.mjs && node --check lib/ai.mjs && node --check server.mjs && node --check cli.mjs && node --check public/app.js",
+    "check": "node --check lib/platform.mjs && node --check lib/lib.mjs && node --check lib/autostart.mjs && node --check lib/ai.mjs && node --check lib/lan.mjs && node --check lib/actions.mjs && node --check lib/gitx.mjs && node --check lib/cleanup.mjs && node --check lib/backup.mjs && node --check lib/jobs.mjs && node --check lib/split.mjs && node --check lib/configx.mjs && node --check server.mjs && node --check cli.mjs && node --check public/app.js",
     "autostart": "node cli.mjs autostart on"
   },
   "engines": {

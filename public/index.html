@@ -27,22 +27,46 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
         <span>Tugas &amp; Project</span>
       </button>
-      <button class="nav-btn" data-view="ports">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>
-        <span>Server &amp; Port</span>
+      <button class="nav-btn" data-view="backup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+        <span>Backup &amp; Restore</span>
+      </button>
+      <button class="nav-btn" data-view="cleanup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m6 6 1 14h10l1-14"/><path d="M10 10v7M14 10v7"/></svg>
+        <span>Cleanup</span>
       </button>
       <button class="nav-btn" data-view="git">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="8" r="2.6"/><path d="M6 8.6v6.8M18 10.6c0 3.2-3 3.4-6 3.9"/></svg>
         <span>Git Helper</span>
       </button>
+      <button class="nav-btn" data-view="ai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.8 4.6L18 9.5l-4.2 1.9L12 16l-1.8-4.6L6 9.5l4.2-1.9z"/><path d="M19 15.5 20 18l2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z"/><path d="M5 15.5 5.8 17.5 8 18.3l-2.2.8L5 21l-.8-1.9L2 18.3l2.2-.8z"/></svg>
+        <span>AI Launcher</span>
+      </button>
+      <button class="nav-btn" data-view="ports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>
+        <span>Server &amp; Port</span>
+      </button>
+      <button class="nav-btn" data-view="api">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="m8 8 4 4-4 4"/><path d="M14 16h3"/></svg>
+        <span>API Tester</span>
+      </button>
       <button class="nav-btn" data-view="download">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>
         <span>Downloader</span>
       </button>
+      <button class="nav-btn" data-view="jobs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>Antrian Job</span>
+      </button>
+      <button class="nav-btn" data-view="config">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+        <span>Config</span>
+      </button>
     </nav>
 
     <div class="side-status" id="sideStatus"></div>
-    <div class="side-foot">devhub v1.2 · cross-platform</div>
+    <div class="side-foot">devhub v2.0 · cross-platform</div>
   </aside>
 
   <main>
@@ -106,6 +130,7 @@
           <span class="hint" id="compressHint">Belum ada file dipilih.</span>
         </div>
 
+        <div class="progress hidden" id="compressProgress"><div class="progress-bar" id="compressProgressBar"></div></div>
         <div class="results" id="results"></div>
       </div>
 
@@ -113,7 +138,7 @@
         <div class="card-head">
           <div>
             <div class="card-title">Kompres dari path lokal</div>
-            <div class="card-sub">Untuk file besar tanpa upload lewat browser.</div>
+            <div class="card-sub">Untuk file besar tanpa upload lewat browser. Jalan di background, bisa dibatalkan.</div>
           </div>
         </div>
         <div class="row">
@@ -129,7 +154,7 @@
         <div class="card-head">
           <div>
             <div class="card-title">Daftar tugas</div>
-            <div class="card-sub">Project terdeteksi otomatis + tugas manual. Bisa run/stop langsung dari sini.</div>
+            <div class="card-sub">Project terdeteksi otomatis + tugas manual. Run/stop langsung dari sini.</div>
           </div>
           <div class="row">
             <button class="btn small" id="taskRefresh">Scan ulang</button>
@@ -151,6 +176,95 @@
         </div>
 
         <div class="task-grid" id="taskGrid"></div>
+      </div>
+    </section>
+
+    <!-- ============================ BACKUP -->
+    <section class="view" id="view-backup">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Backup project + database</div>
+            <div class="card-sub">Arsip project (tanpa node_modules/vendor) plus dump database kalau target punya database.</div>
+          </div>
+          <button class="btn small" id="backupRefresh">Muat</button>
+        </div>
+        <div class="target-grid" id="backupTargets"><div class="hint">Memuat…</div></div>
+        <div class="hint" id="backupNote" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Daftar backup</div>
+            <div class="card-sub" id="backupCount">-</div>
+          </div>
+        </div>
+        <div id="backupList"></div>
+      </div>
+    </section>
+
+    <!-- ============================ CLEANUP -->
+    <section class="view" id="view-cleanup">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Disk saver</div>
+            <div class="card-sub">Hanya folder yang aman dibuat ulang: node_modules, vendor, dist, build, .next, dan sejenisnya.</div>
+          </div>
+          <button class="btn small primary" id="cleanupScan">Scan</button>
+        </div>
+        <div class="row">
+          <label class="hint check-inline"><input type="checkbox" id="cleanupAll" /> pilih semua</label>
+          <button class="btn small danger" id="cleanupDelete" disabled>Hapus terpilih</button>
+          <span class="hint" id="cleanupTotal"></span>
+        </div>
+        <div id="cleanupList" class="cleanup-list"><div class="hint">Klik Scan untuk mulai.</div></div>
+      </div>
+    </section>
+
+    <!-- ============================ GIT -->
+    <section class="view" id="view-git">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Git helper v2</div>
+            <div class="card-sub">Branch, diff, history, stash, discard — tanpa buka terminal.</div>
+          </div>
+          <div class="row">
+            <select class="input" id="gitProject" style="width:240px"></select>
+            <button class="btn small" id="gitRefresh">Muat</button>
+          </div>
+        </div>
+        <div id="gitBody"><div class="hint">Pilih project dulu.</div></div>
+      </div>
+    </section>
+
+    <!-- ============================ AI -->
+    <section class="view" id="view-ai">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">AI Launcher</div>
+            <div class="card-sub">Buat sesi tmux: kiri dev server, kanan AI. Terminal dibuka otomatis.</div>
+          </div>
+          <button class="btn small" id="aiRefresh">Deteksi ulang</button>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label>Project</label>
+            <select class="input" id="aiProject"></select>
+          </div>
+          <div class="field">
+            <label>AI</label>
+            <select class="input" id="aiTool"></select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn primary" id="aiLaunch">Launch split</button>
+          <span class="hint" id="aiNote"></span>
+        </div>
+        <div class="ai-tools" id="aiTools"></div>
       </div>
     </section>
 
@@ -181,23 +295,34 @@
       </div>
     </section>
 
-    <!-- ============================ GIT -->
-    <section class="view" id="view-git">
+    <!-- ============================ API TESTER -->
+    <section class="view" id="view-api">
       <div class="card">
         <div class="card-head">
           <div>
-            <div class="card-title">Git helper</div>
-            <div class="card-sub">Status, commit, pull, push — tanpa buka terminal.</div>
-          </div>
-          <div class="row">
-            <select class="input" id="gitProject" style="width:260px"></select>
-            <button class="btn small" id="gitRefresh">Muat</button>
+            <div class="card-title">API Tester</div>
+            <div class="card-sub">Mini Postman lokal. Request dikirim dari server DevHub.</div>
           </div>
         </div>
-
-        <div id="gitBody">
-          <div class="hint">Pilih project dulu.</div>
+        <div class="row">
+          <select class="input" id="apiMethod" style="width:110px">
+            <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option>
+          </select>
+          <input class="input" id="apiUrl" style="flex:1;min-width:260px" placeholder="http://127.0.0.1:8000/api/..." />
+          <button class="btn primary" id="apiSend">Kirim</button>
         </div>
+        <div class="grid-2" style="margin-top:14px">
+          <div class="field">
+            <label>Headers (JSON)</label>
+            <textarea class="input code" id="apiHeaders" rows="6" placeholder='{"accept":"application/json","authorization":"Bearer ..."}'></textarea>
+          </div>
+          <div class="field">
+            <label>Body</label>
+            <textarea class="input code" id="apiBody" rows="6" placeholder='{"key":"value"}'></textarea>
+          </div>
+        </div>
+        <div class="api-meta" id="apiMeta"></div>
+        <pre class="log-box" id="apiResponse" style="margin-top:12px;min-height:160px">Belum ada request.</pre>
       </div>
     </section>
 
@@ -207,7 +332,7 @@
         <div class="card-head">
           <div>
             <div class="card-title">Downloader</div>
-            <div class="card-sub">yt-dlp kalau ada, fallback ke curl untuk file langsung.</div>
+            <div class="card-sub">yt-dlp kalau ada, fallback ke curl. Jalan sebagai background job.</div>
           </div>
         </div>
         <div class="row">
@@ -220,10 +345,97 @@
           <button class="btn primary" id="dlBtn">Download</button>
         </div>
         <div class="hint" id="dlNote" style="margin-top:10px"></div>
+        <div class="progress hidden" id="dlProgress"><div class="progress-bar" id="dlProgressBar"></div></div>
         <pre class="log-box" id="dlLog" style="margin-top:14px;min-height:120px">Belum ada download.</pre>
       </div>
     </section>
+
+    <!-- ============================ JOBS -->
+    <section class="view" id="view-jobs">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Antrian job</div>
+            <div class="card-sub">Kompres, download, backup, dan restore berjalan di background. Maksimal 2 job paralel.</div>
+          </div>
+          <button class="btn small" id="jobsRefresh">Muat</button>
+        </div>
+        <div id="jobList"><div class="hint">Belum ada job.</div></div>
+      </div>
+    </section>
+
+    <!-- ============================ CONFIG -->
+    <section class="view" id="view-config">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Config editor</div>
+            <div class="card-sub">Perubahan langsung disimpan ke config.json. Port/host baru berlaku setelah restart.</div>
+          </div>
+          <button class="btn small primary" id="configSave">Simpan</button>
+        </div>
+
+        <div class="grid-2">
+          <div class="field"><label>Port</label><input class="input" id="cfgPort" type="number" min="1" max="65535" /></div>
+          <div class="field"><label>Scan depth</label><input class="input" id="cfgDepth" type="number" min="1" max="6" /></div>
+          <div class="field"><label>Kualitas gambar</label><input class="input" id="cfgQuality" type="number" min="20" max="95" /></div>
+          <div class="field"><label>Max dimensi gambar</label><input class="input" id="cfgMaxDim" type="number" min="320" max="7680" /></div>
+          <div class="field">
+            <label>Preset video</label>
+            <select class="input" id="cfgPreset">
+              <option value="4k">4k</option><option value="1080p">1080p</option><option value="720p">720p</option><option value="480p">480p</option>
+            </select>
+          </div>
+          <div class="field"><label>Host</label><input class="input" id="cfgHost" readonly /></div>
+        </div>
+
+        <div class="field" style="margin-top:14px">
+          <label>Scan roots (satu per baris)</label>
+          <textarea class="input code" id="cfgScanRoots" rows="6"></textarea>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label>Services (JSON)</label>
+          <textarea class="input code" id="cfgServices" rows="8"></textarea>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label>Backup targets (JSON)</label>
+          <textarea class="input code" id="cfgBackupTargets" rows="8"></textarea>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn primary" id="configSave2">Simpan config</button>
+          <span class="hint" id="configNote"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">LAN mode</div>
+            <div class="card-sub">Akses dashboard dari HP/laptop lain di Wi-Fi yang sama.</div>
+          </div>
+        </div>
+        <div id="lanInfo" class="lan-info"></div>
+      </div>
+    </section>
   </main>
+</div>
+
+<!-- action modal -->
+<div class="modal hidden" id="actionModal">
+  <div class="modal-card">
+    <div class="card-head" style="margin:0">
+      <div>
+        <div class="card-title" id="actionTitle">Aksi project</div>
+        <div class="card-sub" id="actionSub"></div>
+      </div>
+      <div class="row">
+        <button class="btn small danger hidden" id="actionStop">Stop</button>
+        <button class="btn small ghost" id="actionClose">Tutup</button>
+      </div>
+    </div>
+    <div class="action-list" id="actionList"></div>
+    <pre class="log-box" id="actionLog" style="margin-top:14px;min-height:150px">Pilih aksi di atas.</pre>
+  </div>
 </div>
 
 <div class="modal hidden" id="modal">

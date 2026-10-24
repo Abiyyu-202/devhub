@@ -1,29 +1,43 @@
 # DevHub
 
-Toolbox developer lokal: kompres media, kelola project, port, git, download, plus split `tmux` dengan `agy`, `opencode`, atau AI pilihan — semua dari satu dashboard web di `http://127.0.0.1:7070`.
+Toolbox developer lokal: kompres media, kelola project & aksi script, backup & restore database/project, pembersih disk (cleanup), git helper v2, API tester, download, background jobs queue, config editor, serta split `tmux` dengan `agy`, `opencode`, atau AI pilihan — semua dari satu dashboard web di `http://127.0.0.1:7070` atau via jaringan lokal (LAN).
 
 Berjalan native di **macOS, Linux, dan Windows** dengan **Node.js murni tanpa dependency npm**.
 
-## Fitur
+---
+
+## Fitur Utama
 
 | Menu | Fungsi |
 |---|---|
-| **Kompres Media** | Foto, video, audio. macOS pakai `sips` + `avconvert` bawaan; Linux/Windows pakai `ffmpeg`. Upload lewat browser atau proses path lokal. |
-| **Tugas & Project** | Scan project otomatis (`package.json`, `composer.json`, `index.php`, `artisan`, `manage.py`, `index.html`) + tugas manual. Run/stop dev server dan lihat log realtime. |
-| **Server & Port** | Daftar port yang listen, kill proses nyangkut, dan start/stop layanan lokal sesuai config. |
-| **Git Helper** | Branch, ahead/behind, file berubah, commit all, pull, push. |
-| **Downloader** | `yt-dlp` kalau tersedia, fallback `curl` untuk file langsung. |
+| **Kompres Media** | Foto, video, audio. macOS pakai `sips` + `avconvert` bawaan; Linux/Windows pakai `ffmpeg`. Upload via browser atau proses file lokal dengan antrian background. |
+| **Tugas & Project** | Scan project otomatis (`package.json`, `composer.json`, `index.php`, `artisan`, `manage.py`, `index.html`) + tugas manual. Run/stop dev server dan pantau log realtime. |
+| **Aksi Project** | Jalankan skrip per project langsung dari UI atau CLI (`npm run test/build/lint`, `php artisan migrate/seed`, `composer install`). |
+| **Backup & Restore** | Backup arsip project (`tar.gz`) + dump database MySQL/MariaDB (`mysqldump`). Restore dengan konfirmasi aman dan opsi timpa atau folder baru. |
+| **Cleanup / Penghemat Disk** | Pindai dan bersihkan folder yang bisa di-regenerasi (`node_modules`, `vendor`, `dist`, `build`, `.next`, cache) di dalam `scanRoots` untuk melegakan ruang disk. |
+| **Git Helper v2** | Info branch, ganti branch, buat/hapus branch, diff viewer, commit history, stash list/pop, discard changes, dan stage/unstage per file. |
+| **AI Launcher Dashboard** | Pilih project dan AI CLI (agy, opencode, claude, codex, gemini, dll.), otomatis buat sesi tmux split dan buka jendela Terminal. |
+| **Server & Port** | Daftar port yang listen, kill proses nyangkut, serta start/stop layanan lokal sesuai konfigurasi. |
+| **API Tester** | Mini HTTP client alternatif Postman: kirim GET, POST, PUT, DELETE dengan custom header & JSON body, lengkap dengan status, durasi (ms), dan ukuran respons. |
+| **Downloader** | Download video/audio via `yt-dlp` jika tersedia, atau fallback `curl` untuk file langsung dengan progress bar. |
+| **Antrian Job (Jobs Queue)** | Eksekusi background berurutan untuk tugas berat (backup, download, kompresi) dengan status dan progress realtime via Server-Sent Events (SSE). |
+| **Config Editor** | Kelola konfigurasi `config.json` langsung dari UI web (port, scanRoots, scanDepth, services, backup targets). |
+| **LAN Mode** | Akses dashboard dari HP atau laptop lain di Wi-Fi yang sama dengan pengamanan password (token). |
 
-## Kebutuhan
+---
+
+## Kebutuhan Sistem
 
 - **Node.js 20+** (wajib)
 - **git** dan **curl** (disarankan)
 - **tmux** untuk split AI `devhub agy` / `opc` / `ai` (macOS/Linux; Windows via WSL)
-- **fzf** opsional — pencarian project yang lebih nyaman
+- **fzf** opsional — pencarian project yang lebih interaktif
 - **ffmpeg** untuk kompresi di Linux/Windows (macOS tidak perlu)
-- **yt-dlp** opsional untuk download dari situs streaming
+- **yt-dlp** opsional untuk download dari situs streaming video/audio
 
-## Quick start
+---
+
+## Quick Start
 
 ```bash
 git clone https://github.com/Abiyyu-202/devhub.git
@@ -40,7 +54,7 @@ Script akan mengecek dependency, memasang yang kurang (opsional), membuat launch
 
 Buka **http://127.0.0.1:7070**.
 
-### Setup manual
+### Setup Manual
 
 ```bash
 # macOS / Linux
@@ -55,7 +69,9 @@ node cli.mjs start
 # lalu buat shim devhub.cmd berisi: node "C:\path\ke\devhub\cli.mjs" %*
 ```
 
-## Autostart saat login
+---
+
+## Autostart Saat Login
 
 ```bash
 devhub autostart on       # aktifkan
@@ -69,53 +85,54 @@ devhub autostart off      # matikan
 | Linux | systemd user unit | `~/.config/systemd/user/devhub.service` |
 | Windows | Startup folder (VBS, tanpa jendela) | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\DevHub.vbs` |
 
-Linux: kalau ingin tetap jalan setelah logout, aktifkan linger sekali saja: `sudo loginctl enable-linger $USER`.
+*Linux*: kalau ingin tetap jalan setelah logout, aktifkan linger sekali saja: `sudo loginctl enable-linger $USER`.
+
+---
 
 ## Perintah CLI
 
 ```bash
-devhub                      # menu interaktif
-devhub start                # nyalakan server di background
-devhub stop                 # matikan server background
-devhub restart              # restart server background
-devhub update               # pull update DevHub (tanpa restart)
-devhub update --restart     # pull + restart server
-devhub check                # cek dependency yang kurang
-devhub serve                # foreground di http://127.0.0.1:7070
-devhub dashboard            # nyalakan + buka browser
-devhub tasks                # daftar project terdeteksi
-devhub run "Nama Project"   # jalankan dev server project
-devhub agy "Nama Project"   # pilih project → tmux: dev server + agy
-devhub opc "Nama Project"   # pilih project → tmux: dev server + opencode
-devhub ai "Nama Project"    # pilih project + AI apa saja
-devhub ai --list            # daftar AI CLI yang terdeteksi
-devhub compress foto.jpg --quality=70 --max=1600
-devhub compress video.mov --preset=720p
-devhub ports                # lihat port yang listen
-devhub ports kill 1234
-devhub git ~/Project status
-devhub git ~/Project commit "pesan"
-devhub git ~/Project push
-devhub download "https://…" --audio
-devhub status               # status layanan + server
-devhub autostart on|off|status
+devhub                                      # menu interaktif
+devhub start                                # nyalakan server di background
+devhub stop                                 # matikan server background
+devhub restart                              # restart server background
+devhub update                               # pull update DevHub (tanpa restart)
+devhub update --restart                     # pull + restart server
+devhub check                                # cek dependency yang kurang
+devhub serve                                # jalankan foreground di http://127.0.0.1:7070
+devhub dashboard                            # nyalakan + buka browser otomatis
+devhub tasks                                # daftar project terdeteksi
+devhub run [nama]                           # jalankan dev server project
+devhub actions [nama]                       # pilih & jalankan skrip project (migrate/test/build)
+devhub agy [nama]                           # pilih project → tmux: dev server + agy
+devhub opc [nama]                           # pilih project → tmux: dev server + opencode
+devhub ai [nama]                            # pilih project + AI apa saja (agy/opencode/claude/…)
+devhub ai --list                            # daftar AI CLI yang terdeteksi di sistem
+devhub backup list                          # daftar arsip backup yang ada
+devhub backup create                        # buat backup project + database
+devhub backup restore [file]                # restore arsip backup
+devhub backup delete [file]                 # hapus arsip backup
+devhub clean [--scan|--yes]                 # pindai atau bersihkan node_modules/build di scanRoots
+devhub jobs [cancel <id>]                   # pantau antrian job background
+devhub compress foto.jpg --quality=70       # kompres foto
+devhub compress video.mov --preset=720p     # kompres video
+devhub ports                                # lihat port yang sedang listen
+devhub ports kill 1234                      # matikan proses berdasarkan PID
+devhub git [path] status|pull|push|commit   # operasi git
+devhub download "https://…" --audio        # unduh file/audio/video
+devhub config [show|path|edit]              # lihat atau edit file konfigurasi
+devhub lan [on|off|status]                  # aktifkan akses dashboard dari jaringan Wi-Fi lokal
+devhub status                               # status layanan + server background
+devhub autostart [on|off|status]            # konfigurasi autostart saat boot/login
 ```
 
-## Update & maintenance
-
-```bash
-devhub check     # dependency apa saja yang kurang + perintah install
-devhub update    # pull update DevHub sendiri (fast-forward); batal kalau ada perubahan lokal
-devhub restart   # stop + start server background
-```
-
-`devhub update` hanya menarik update untuk repo DevHub, bukan project user. Default-nya tidak restart server; jalankan `devhub restart` setelahnya kalau perlu. Pakai `devhub update --restart` kalau ingin pull sekaligus restart.
+---
 
 ## Split AI: `agy`, `opc`, `ai`
 
-Ketiganya selalu menampilkan **pilihan project dulu** (walaupun projectnya cuma satu), baru setelah itu dev server dan AI dijalankan berdampingan:
+Menjalankan dev server di pane kiri dan AI CLI di pane kanan dalam satu sesi `tmux`:
 
-```
+```text
 ┌───────────────────────────┬───────────────────────────┐
 │ dev · NamaProject         │ agy / opencode / AI       │
 │ $ npm run dev             │ $ agy                     │
@@ -123,31 +140,57 @@ Ketiganya selalu menampilkan **pilihan project dulu** (walaupun projectnya cuma 
 └───────────────────────────┴───────────────────────────┘
 ```
 
-| Perintah | AI di pane kanan |
+| Perintah | AI di Pane Kanan |
 |---|---|
 | `devhub agy [project]` | `agy` (Antigravity) |
 | `devhub opc [project]` | `opencode` |
 | `devhub ai [project]` | pilih dari AI yang terdeteksi |
-| `devhub ai --ai=claude [project]` | langsung pilih AI tertentu |
+| `devhub ai --ai=claude [project]` | langsung gunakan AI tertentu |
 | `devhub ai --list` | lihat semua AI dan status install-nya |
 
-`devhub ai` mendeteksi AI CLI yang ada di `PATH`: `agy`, `opencode`, `claude`, `codex`, `gemini`, `aider`, `cursor-agent`, `copilot`, `qwen`, `crush`, `goose`, `amp`. Yang belum terpasang tidak ditampilkan di menu pilihan (tapi tetap terlihat di `--list`).
+Dukungan AI CLI: `agy`, `opencode`, `claude`, `codex`, `gemini`, `aider`, `cursor-agent`, `copilot`, `qwen`, `crush`, `goose`, `amp`.
 
-- macOS: `brew install tmux`
-- Debian/Ubuntu: `sudo apt install tmux`
-- Windows: jalankan DevHub dari **WSL**, karena tmux tidak tersedia native.
+---
 
-Nama sesi tmux: `devhub-<project>-<ai>`, jadi sesi `agy` dan `opencode` untuk project yang sama tidak saling menimpa. Kalau sesi sudah ada, DevHub langsung attach. Kalau AI belum login, pane kanan akan menampilkan instruksi login dari CLI masing-masing.
+## Akses LAN & Keamanan
+
+Secara default, DevHub hanya bind ke `127.0.0.1` (localhost). Jika kamu ingin mengakses dashboard dari perangkat lain (misal HP atau laptop lain di Wi-Fi yang sama):
+
+```bash
+devhub lan on       # mengaktifkan host 0.0.0.0 & menghasilkan access token
+devhub lan status   # melihat IP LAN, URL akses, dan token password
+devhub lan off      # mengembalikan bind ke localhost (127.0.0.1)
+```
+
+### Mekanisme Keamanan:
+- **Akses Lokal (`localhost` / `127.0.0.1`)**: Tetap instan tanpa password.
+- **Akses Jaringan (`192.168.x.x`)**: Dilindungi HTTP Basic Auth. Browser akan meminta login:
+  - **Username**: bebas (boleh dikosongkan atau diisi apa saja)
+  - **Password**: masukkan *Access Token* yang tertera pada `devhub lan status`
+- Token disimpan aman di `~/.config/devhub/config.json` dan divalidasi dengan *timing-safe comparison*.
+
+---
 
 ## Konfigurasi
 
-Config: `~/.config/devhub/config.json` (Linux/macOS) atau `%APPDATA%\devhub\config.json` (Windows).
+File konfigurasi berada di:
+- **macOS / Linux**: `~/.config/devhub/config.json`
+- **Windows**: `%APPDATA%\devhub\config.json`
+
+Contoh konfigurasi lengkap:
 
 ```json
 {
   "port": 7070,
-  "scanRoots": ["/Users/kamu/Projects", "/Users/kamu/Sites"],
+  "host": "0.0.0.0",
+  "accessToken": "token_acak_devhub",
+  "scanRoots": [
+    "/Users/kamu/Projects",
+    "/Users/kamu/Sites"
+  ],
   "scanDepth": 2,
+  "outputDir": "/Users/kamu/.local/share/devhub/output",
+  "downloadDir": "/Users/kamu/Downloads",
   "image": { "quality": 75, "maxDim": 1920 },
   "video": { "preset": "1080p" },
   "services": [
@@ -165,15 +208,30 @@ Config: `~/.config/devhub/config.json` (Linux/macOS) atau `%APPDATA%\devhub\conf
       "start": "php -S 127.0.0.1:8080 -t /path/ke/phpmyadmin",
       "stop": ["pkill", "-f", "php -S 127.0.0.1:8080"]
     }
-  ]
+  ],
+  "backup": {
+    "dir": "",
+    "targets": [
+      {
+        "id": "brmotor",
+        "label": "BR Motor",
+        "path": "/Users/kamu/BRMotor",
+        "database": {
+          "engine": "mariadb",
+          "name": "br_motor",
+          "user": "root",
+          "socket": "/tmp/mysql.sock",
+          "binDir": "/opt/local/lib/mariadb-11.4/bin"
+        }
+      }
+    ]
+  }
 }
 ```
 
-- `services` sepenuhnya bebas: isi `port` atau `url` untuk status, dan `start`/`stop` (string shell atau array argv) untuk kontrol.
-- Tanpa `services`, menu Server & Port tetap menampilkan semua port yang listen.
-- Tugas manual disimpan di `tasks.json` (lebih mudah lewat UI).
+---
 
-## Lokasi data
+## Lokasi Data
 
 | Data | macOS / Linux | Windows |
 |---|---|---|
@@ -181,32 +239,9 @@ Config: `~/.config/devhub/config.json` (Linux/macOS) atau `%APPDATA%\devhub\conf
 | Output kompresi | `~/.local/share/devhub/output/` | `%LOCALAPPDATA%\devhub\output\` |
 | Log | `~/.local/share/devhub/logs/` | `%LOCALAPPDATA%\devhub\logs\` |
 | Download | `~/Downloads/` | `%USERPROFILE%\Downloads\` |
+| Backup | `~/.local/share/devhub/backups/` | `%LOCALAPPDATA%\devhub\backups\` |
 
-## Backend kompresi
-
-| OS | Foto | Video / audio |
-|---|---|---|
-| macOS | `sips` (bawaan) | `avconvert` (bawaan) |
-| Linux / Windows | `ffmpeg` | `ffmpeg` |
-
-Kalau hasil kompresi tidak lebih kecil, file asli dipertahankan dan hasilnya ditandai **"Sudah optimal"**.
-
-Install ffmpeg:
-
-```bash
-# macOS
-brew install ffmpeg
-# Debian/Ubuntu
-sudo apt install ffmpeg
-# Fedora
-sudo dnf install ffmpeg
-# Windows
-winget install Gyan.FFmpeg
-```
-
-## Keamanan
-
-Server hanya bind ke `127.0.0.1` dan **tidak punya autentikasi**. Jangan expose port `7070` ke jaringan publik. DevHub bisa menjalankan perintah shell dari config dan UI, jadi perlakukan seperti terminal lokal.
+---
 
 ## Lisensi
 

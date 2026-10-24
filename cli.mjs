@@ -8,14 +8,19 @@ import readline from 'node:readline/promises';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  ROOT, HOME, LOG_DIR, OUTPUT_DIR, DOWNLOAD_DIR,
-  ensureDirs, loadConfig, mergedTasks, findTask, compressMedia,
+  ROOT, HOME, LOG_DIR, OUTPUT_DIR, DOWNLOAD_DIR, CONFIG_FILE,
+  ensureDirs, loadConfig, saveConfig, mergedTasks, findTask, compressMedia,
   listPorts, killPid, gitInfo, gitAction, getServices, controlService, which,
   slugify, formatBytes, detectProject, logName, platformLabel, IS_WIN, IS_MAC,
 } from './lib/lib.mjs';
 import { openTarget, pidsOnPort, killProcess, spawnShell, pathWithExtras } from './lib/platform.mjs';
 import { autostartStatus, enableAutostart, disableAutostart } from './lib/autostart.mjs';
 import { aiKeys, resolveAi, detectAiTools, installedAiTools, installHint } from './lib/ai.mjs';
+import { lanAddresses, makeToken, isLoopbackHost, maskToken } from './lib/lan.mjs';
+import { detectActions } from './lib/actions.mjs';
+import { gitBranches, gitHistory, gitDiff, gitStashList, gitV2 } from './lib/gitx.mjs';
+import { scanCleanup, deleteCleanup } from './lib/cleanup.mjs';
+import { createBackup, listBackups, restoreBackup, deleteBackup, configuredTargets } from './lib/backup.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const C = {
@@ -625,9 +630,11 @@ async function cmdPorts(args) {
 
 async function cmdGit(args) {
   const dir = resolveUserPath(args[0] || process.cwd());
-  const actionIndex = args.findIndex((a) => ['status', 'pull', 'push', 'commit'].includes(a));
+  const actions = ['status', 'pull', 'push', 'commit', 'fetch', 'branches', 'switch', 'create', 'delete', 'diff', 'history', 'stash', 'stash-pop', 'stash-list', 'discard', 'stage', 'unstage'];
+  const actionIndex = args.findIndex((a) => actions.includes(a));
   const action = actionIndex >= 0 ? args[actionIndex] : 'status';
-  const message = args.slice(actionIndex + 1).join(' ');
+  const rest = actionIndex >= 0 ? args.slice(actionIndex + 1) : [];
+  const message = rest.join(' ');
 
   if (action === 'status') {
     const info = await gitInfo(dir);
@@ -640,7 +647,59 @@ async function cmdGit(args) {
   }
 
   try {
-    const output = await gitAction(dir, action, message);
+    if (action === 'branches') {
+      const data = await gitBranches(dir);
+      header(`Branch · ${path.basename(dir)}`);
+      for (const branch of data.branches) {
+        console.log(`  ${branch.current ? c(C.green, '●') : c(C.dim, '○')} ${branch.name}${branch.current ? dim('  (aktif)') : ''}`);
+      }
+      if (data.remote.length) console.log(`\n  ${dim('remote:')} ${data.remote.join(', ')}`);
+      return;
+    }
+    if (action === 'history') {
+      const commits = await gitHistory(dir, 25);
+      header(`History · ${path.basename(dir)}`);
+      for (const commit of commits) {
+        console.log(`  ${c(C.yellow, commit.hash)} ${commit.subject} ${dim(`· ${commit.author} · ${commit.when}`)}`);
+      }
+      return;
+    }
+    if (action === 'diff') {
+      const diff = await gitDiff(dir, rest[0] || '', rest.includes('--staged'));
+      console.log(diff || dim('(tidak ada diff)'));
+      return;
+    }
+    if (action === 'stash-list') {
+      const stashes = await gitStashList(dir);
+      header('Stash');
+      if (!stashes.length) console.log(`  ${dim('tidak ada stash')}`);
+      for (const stash of stashes) console.log(`  ${c(C.cyan, stash.ref)} ${stash.subject}`);
+      return;
+    }
+
+    let output;
+    if (action === 'switch') {
+      if (!rest[0]) fail('Pakai: devhub git <path> switch <branch>');
+      output = await gitV2(dir, 'switch', { branch: rest[0] });
+    } else if (action === 'create') {
+      if (!rest[0]) fail('Pakai: devhub git <path> create <branch>');
+      output = await gitV2(dir, 'create', { branch: rest[0] });
+    } else if (action === 'delete') {
+      if (!rest[0]) fail('Pakai: devhub git <path> delete <branch>');
+      output = await gitV2(dir, 'delete', { branch: rest[0], force: rest.includes('--force') });
+    } else if (action === 'stash') {
+      output = await gitV2(dir, 'stash', { message });
+    } else if (action === 'stash-pop') {
+      output = await gitV2(dir, 'stash-pop', {});
+    } else if (action === 'discard') {
+      if (!rest[0]) fail('Pakai: devhub git <path> discard <file>');
+      output = await gitV2(dir, 'discard', { file: rest[0] });
+    } else if (action === 'stage' || action === 'unstage') {
+      if (!rest[0]) fail(`Pakai: devhub git <path> ${action} <file>`);
+      output = await gitV2(dir, action, { file: rest[0] });
+    } else {
+      output = await gitAction(dir, action, message);
+    }
     console.log(`${c(C.green, '✔')} git ${action}`);
     if (output) console.log(output);
   } catch (error) {
@@ -692,6 +751,10 @@ async function cmdStatus() {
   }
   if (!services.length) console.log(`  ${dim('belum ada layanan di config')}`);
   console.log(`  ${dot(alive)} ${'DevHub'.padEnd(14)} ${dim(`http://127.0.0.1:${cfg.port}`)}`);
+  if (!isLoopbackHost(cfg.host)) {
+    const addresses = lanAddresses();
+    console.log(`  ${c(C.green, '●')} ${'LAN'.padEnd(14)} ${dim(addresses.length ? addresses.map((a) => `http://${a}:${cfg.port}`).join(', ') : 'aktif (tanpa alamat)')}`);
+  }
   console.log(`\n  ${ports.length} port listen · ${(await taskList()).length} project · ${platformLabel()}`);
 }
 
@@ -730,6 +793,297 @@ async function cmdAutostart(args) {
   }
 }
 
+async function cmdLan(args) {
+  const action = args[0] || 'status';
+  const cfg = await loadConfig();
+
+  if (action === 'on' || action === 'enable' || action === 'start') {
+    const token = cfg.accessToken || makeToken();
+    await saveConfig({ host: '0.0.0.0', accessToken: token });
+    header('DevHub LAN');
+    console.log(`  ${c(C.green, '✔')} LAN mode ${c(C.bold, 'ON')} ${dim('· bind 0.0.0.0')}`);
+    console.log(`  ${dim('Password:')} ${c(C.cyan, token)}`);
+    const addresses = lanAddresses();
+    if (addresses.length) {
+      for (const address of addresses) console.log(`  ${dim('URL:')} ${c(C.cyan, `http://${address}:${cfg.port || 7070}`)}`);
+    } else {
+      console.log(`  ${c(C.yellow, '⚠')} Tidak ada alamat LAN terdeteksi.`);
+    }
+    console.log(`\n  ${dim('Akses dari Mac ini tetap tanpa password (127.0.0.1).')}`);
+    console.log(`  ${c(C.yellow, '⚠')} Hanya pakai di Wi-Fi tepercaya — dashboard bisa menjalankan perintah shell.`);
+    console.log(`\n  ${dim('Restart server…')}`);
+    try {
+      const result = await restartServer();
+      console.log(`  ${c(C.green, '✔')} Server jalan di ${c(C.cyan, `http://127.0.0.1:${result.port}`)}${result.via ? dim(` (${result.via})`) : ''}`);
+      if (addresses[0]) console.log(`  ${c(C.green, '✔')} LAN ${c(C.cyan, `http://${addresses[0]}:${result.port}`)}`);
+    } catch (error) {
+      console.log(`  ${c(C.yellow, '⚠')} Gagal restart: ${error.message}`);
+      console.log(`  ${dim('Coba manual:')} ${c(C.cyan, 'devhub restart')}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (action === 'off' || action === 'disable' || action === 'stop') {
+    await saveConfig({ host: '127.0.0.1' });
+    header('DevHub LAN');
+    console.log(`  ${c(C.green, '✔')} LAN mode ${c(C.bold, 'OFF')} ${dim('· bind 127.0.0.1')}`);
+    try {
+      const result = await restartServer();
+      console.log(`  ${c(C.green, '✔')} Server jalan lagi di ${c(C.cyan, `http://127.0.0.1:${result.port}`)}`);
+    } catch (error) {
+      console.log(`  ${c(C.yellow, '⚠')} Gagal restart: ${error.message}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (action === 'status') {
+    const enabled = !isLoopbackHost(cfg.host);
+    header('DevHub LAN');
+    console.log(`  Status    : ${enabled ? c(C.green, 'ON') : c(C.red, 'OFF')} ${dim(`· host ${cfg.host || '127.0.0.1'}`)}`);
+    console.log(`  Password  : ${cfg.accessToken ? c(C.cyan, maskToken(cfg.accessToken)) : dim('(belum ada)')}`);
+    console.log(`  Lokal     : ${dim(`http://127.0.0.1:${cfg.port || 7070}`)} ${dim('(tanpa password)')}`);
+    if (enabled) {
+      const addresses = lanAddresses();
+      for (const address of addresses) console.log(`  LAN       : ${c(C.cyan, `http://${address}:${cfg.port || 7070}`)}`);
+      if (!addresses.length) console.log(`  LAN       : ${dim('tidak ada alamat terdeteksi')}`);
+    }
+    console.log(`\n  ${dim('Ubah:')} devhub lan on|off`);
+    return;
+  }
+
+  fail('Pakai: devhub lan [on|off|status]');
+}
+
+// ---------------------------------------------------------------- backup
+
+async function cliBackupTargets(cfg) {
+  const configured = configuredTargets(cfg);
+  const tasks = await mergedTasks(cfg);
+  const seen = new Set(configured.map((target) => path.resolve(target.path)));
+  const extras = tasks
+    .filter((task) => !seen.has(path.resolve(task.path)))
+    .map((task) => ({ id: `task:${task.id}`, label: task.name, path: task.path, database: null, configured: false }));
+  return [...configured, ...extras];
+}
+
+async function cmdBackup(args) {
+  const action = args[0] || 'list';
+  const cfg = await loadConfig();
+  const targets = await cliBackupTargets(cfg);
+
+  if (action === 'list' || action === 'ls') {
+    const backups = await listBackups(cfg);
+    header('Backup');
+    if (!backups.length) {
+      console.log(`  ${dim('belum ada backup')}`);
+      console.log(`  ${dim('buat:')} devhub backup create`);
+      return;
+    }
+    for (const backup of backups) {
+      console.log(`  ${c(C.cyan, backup.file)}`);
+      console.log(`    ${dim(`${formatBytes(backup.size)} · ${backup.label}${backup.database ? ` · DB ${backup.database}` : ''} · ${new Date(backup.createdAt).toLocaleString('id-ID')}`)}`);
+    }
+    return;
+  }
+
+  if (action === 'create') {
+    let target = targets.find((item) => item.id === args[1] || item.label === args[1]);
+    if (!target) target = await choose('Pilih target backup', targets.map((item) => ({
+      label: item.label,
+      hint: `${item.path}${item.database ? ` · DB ${item.database.name}` : ''}`,
+      value: item,
+    })));
+    if (!target) return;
+    console.log(`\n  ${dim('Backup:')} ${target.label} ${dim(target.path)}`);
+    const result = await createBackup(cfg, target, {
+      onProgress: (percent, message) => {
+        process.stdout.write(`\r  ${c(C.cyan, String(Math.round(percent)).padStart(3))}% ${dim(message || '')}          `);
+      },
+    });
+    process.stdout.write('\n');
+    console.log(`  ${c(C.green, '✔')} ${result.file} ${dim(`(${formatBytes(result.size)})`)}`);
+    console.log(`  ${dim('lokasi:')} ${path.dirname(result.path)}`);
+    return;
+  }
+
+  if (action === 'restore') {
+    const backups = await listBackups(cfg);
+    if (!backups.length) fail('Belum ada backup');
+    let file = args[1];
+    if (!file) {
+      const picked = await choose('Pilih backup', backups.map((backup) => ({
+        label: backup.file,
+        hint: `${formatBytes(backup.size)} · ${backup.label}${backup.database ? ` · DB ${backup.database}` : ''}`,
+        value: backup.file,
+      })));
+      if (!picked) return;
+      file = picked;
+    }
+    const mode = args.includes('--overwrite') ? 'overwrite' : 'new';
+    const withDatabase = !args.includes('--no-db');
+    console.log(`\n  ${c(C.yellow, '⚠')} Restore ${c(C.bold, file)}`);
+    console.log(`  Mode project: ${mode === 'overwrite' ? c(C.red, 'TIMPA folder asli') : 'folder baru .restore-*'}`);
+    console.log(`  Database: ${withDatabase ? 'ikut direstore' : 'dilewati'}`);
+    const answer = await readLine('Ketik RESTORE untuk lanjut: ');
+    if (answer !== 'RESTORE') {
+      console.log(`  ${dim('dibatalkan')}`);
+      return;
+    }
+    const result = await restoreBackup(cfg, targets, file, {
+      confirm: 'RESTORE',
+      mode,
+      withDatabase,
+      onProgress: (percent, message) => {
+        process.stdout.write(`\r  ${c(C.cyan, String(Math.round(percent)).padStart(3))}% ${dim(message || '')}          `);
+      },
+    });
+    process.stdout.write('\n');
+    console.log(`  ${c(C.green, '✔')} Project: ${result.restoredPath}`);
+    if (result.database) console.log(`  ${c(C.green, '✔')} Database: ${result.database}`);
+    return;
+  }
+
+  if (action === 'delete') {
+    const file = args[1];
+    if (!file) fail('Pakai: devhub backup delete <file>');
+    await deleteBackup(cfg, file);
+    console.log(`${c(C.green, '✔')} ${file} dihapus`);
+    return;
+  }
+
+  fail('Pakai: devhub backup [list|create|restore|delete]');
+}
+
+// ---------------------------------------------------------------- cleanup
+
+async function cmdClean(args) {
+  const cfg = await loadConfig();
+  header('Cleanup');
+  console.log(`  ${dim('scanRoots:')} ${cfg.scanRoots.join(', ')}`);
+  console.log(`  ${dim('Memindai folder build…')}`);
+  const result = await scanCleanup(cfg);
+  if (!result.entries.length) {
+    console.log(`  ${c(C.green, '✔')} Tidak ada folder yang bisa dibersihkan.`);
+    return;
+  }
+
+  for (let index = 0; index < result.entries.length; index += 1) {
+    const entry = result.entries[index];
+    console.log(`  ${c(C.cyan, String(index + 1).padStart(2))}. ${String(formatBytes(entry.size)).padStart(9)}  ${entry.path}`);
+  }
+  console.log(`\n  ${c(C.bold, formatBytes(result.total))} bisa dibebaskan dari ${result.entries.length} folder.`);
+
+  if (args.includes('--scan')) return;
+  let selected;
+  if (args.includes('--yes') || args.includes('-y')) {
+    selected = result.entries;
+  } else {
+    const answer = await readLine('Hapus semua [y/N] atau ketik nomor (1,3,5): ');
+    const value = answer.trim().toLowerCase();
+    if (!value || value === 'n' || value === 'no') {
+      console.log(`  ${dim('dibatalkan')}`);
+      return;
+    }
+    if (value === 'y' || value === 'yes') selected = result.entries;
+    else {
+      const indexes = value.split(/[,\s]+/).map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= result.entries.length);
+      selected = indexes.map((n) => result.entries[n - 1]);
+    }
+  }
+  if (!selected.length) {
+    console.log(`  ${dim('tidak ada yang dipilih')}`);
+    return;
+  }
+
+  const check = await readLine(`Hapus ${selected.length} folder (${formatBytes(selected.reduce((sum, entry) => sum + entry.size, 0))})? [y/N]: `);
+  if (!/^y(es)?$/i.test(check.trim())) {
+    console.log(`  ${dim('dibatalkan')}`);
+    return;
+  }
+  const deleted = await deleteCleanup(cfg, selected.map((entry) => entry.path));
+  console.log(`  ${c(C.green, '✔')} ${deleted.deleted.length} folder dihapus · ${formatBytes(deleted.freed)} dibebaskan`);
+  for (const skipped of deleted.skipped) console.log(`  ${c(C.yellow, '⚠')} ${skipped.path}: ${skipped.reason}`);
+}
+
+// ---------------------------------------------------------------- actions
+
+async function cmdActions(query) {
+  const task = await pickTask(query, { alwaysPrompt: true });
+  if (!task) return;
+  const actions = detectActions(task);
+  if (!actions.length) {
+    console.log(`${c(C.yellow, '⚠')} Tidak ada aksi terdeteksi untuk ${task.name}.`);
+    return;
+  }
+  const action = await choose(`Aksi · ${task.name}`, actions.map((item) => ({
+    label: item.label,
+    hint: `${item.group} · ${item.command}`,
+    value: item,
+  })));
+  if (!action) return;
+  if (action.risky) {
+    const answer = await readLine(`Aksi "${action.label}" bisa mengubah data. Lanjut? [y/N]: `);
+    if (!/^y(es)?$/i.test(answer.trim())) return;
+  }
+  console.log(`\n  ${dim('$')} ${action.command}  ${dim(`(cwd: ${task.path})`)}\n`);
+  const spec = spawnShell(action.command, { cwd: task.path, stdio: 'inherit' });
+  const child = spawn(spec.file, spec.args, spec.options);
+  child.on('exit', (code) => process.exit(code ?? 0));
+}
+
+// ---------------------------------------------------------------- jobs
+
+async function cmdJobs(args) {
+  const cfg = await loadConfig();
+  const base = `http://127.0.0.1:${cfg.port || 7070}`;
+  if (args[0] === 'cancel') {
+    if (!args[1]) fail('Pakai: devhub jobs cancel <id>');
+    const response = await fetch(`${base}/api/jobs/${encodeURIComponent(args[1])}/cancel`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) fail(data.error || 'Gagal cancel');
+    console.log(`${c(C.green, '✔')} ${data.ok ? 'Dibatalkan' : 'Job tidak bisa dibatalkan'}`);
+    return;
+  }
+  try {
+    const response = await fetch(`${base}/api/jobs`);
+    const data = await response.json();
+    header('Antrian job');
+    if (!data.jobs.length) console.log(`  ${dim('kosong')}`);
+    for (const job of data.jobs) {
+      const status = job.status === 'done' ? c(C.green, 'done') : job.status === 'error' ? c(C.red, 'error') : job.status === 'running' ? c(C.cyan, 'run') : job.status === 'canceled' ? c(C.yellow, 'cancel') : dim('queued');
+      console.log(`  ${status.padEnd(14)} ${String(job.progress).padStart(3)}%  ${job.label} ${dim(job.id)}`);
+      if (job.message) console.log(`    ${dim(job.message)}`);
+    }
+  } catch {
+    fail('Server DevHub tidak jalan — jalankan devhub start');
+  }
+}
+
+// ---------------------------------------------------------------- config
+
+async function cmdConfig(args) {
+  const cfg = await loadConfig();
+  const action = args[0] || 'show';
+  if (action === 'path') {
+    console.log(CONFIG_FILE);
+    return;
+  }
+  if (action === 'edit') {
+    await openTarget(CONFIG_FILE);
+    return;
+  }
+  header('DevHub config');
+  console.log(`  ${dim('file:')} ${CONFIG_FILE}`);
+  console.log(`  port      : ${cfg.port}`);
+  console.log(`  host      : ${cfg.host} ${isLoopbackHost(cfg.host) ? dim('(lokal)') : c(C.green, '(LAN)')}`);
+  console.log(`  scanRoots : ${cfg.scanRoots.length} folder`);
+  console.log(`  services  : ${(cfg.services || []).length}`);
+  console.log(`  backup    : ${(cfg.backup?.targets || []).length} target · ${cfg.backup?.dir || '(default)'}`);
+  console.log(`\n  ${dim('edit lewat dashboard → Config, atau:')} devhub config edit`);
+}
+
 // ---------------------------------------------------------------- menu
 
 async function menu() {
@@ -747,6 +1101,12 @@ async function menu() {
     { label: 'Port & service', hint: 'lihat / kill', value: 'ports' },
     { label: 'Git status', hint: 'project aktif', value: 'git' },
     { label: 'Download', hint: 'video / audio / file', value: 'download' },
+    { label: 'Backup & restore', hint: 'project + database', value: 'backup' },
+    { label: 'Cleanup', hint: 'hapus node_modules / build', value: 'clean' },
+    { label: 'Aksi project', hint: 'migrate / test / build', value: 'actions' },
+    { label: 'Antrian job', hint: 'progress background', value: 'jobs' },
+    { label: 'Config', hint: 'lihat / edit config', value: 'config' },
+    { label: 'LAN mode', hint: 'akses dari HP / laptop lain', value: 'lan' },
     { label: 'Autostart', hint: 'nyala otomatis saat login', value: 'autostart' },
     { label: 'Cek dependency', hint: 'devhub check', value: 'check' },
     { label: 'Update DevHub', hint: 'git pull', value: 'update' },
@@ -773,6 +1133,15 @@ async function menu() {
     const url = await readLine('URL: ');
     return cmdDownload([url]);
   }
+  if (choice === 'lan') {
+    const cfg = await loadConfig();
+    return cmdLan([isLoopbackHost(cfg.host) ? 'on' : 'off']);
+  }
+  if (choice === 'backup') return cmdBackup([]);
+  if (choice === 'clean') return cmdClean([]);
+  if (choice === 'actions') return cmdActions();
+  if (choice === 'jobs') return cmdJobs([]);
+  if (choice === 'config') return cmdConfig([]);
   if (choice === 'autostart') {
     const status = await autostartStatus();
     return cmdAutostart([status.enabled ? 'off' : 'on']);
@@ -858,6 +1227,25 @@ switch (command) {
   case 'autostart':
     await cmdAutostart(rest);
     break;
+  case 'lan':
+    await cmdLan(rest);
+    break;
+  case 'backup':
+    await cmdBackup(rest);
+    break;
+  case 'clean':
+  case 'cleanup':
+    await cmdClean(rest);
+    break;
+  case 'actions':
+    await cmdActions(rest[0]);
+    break;
+  case 'jobs':
+    await cmdJobs(rest);
+    break;
+  case 'config':
+    await cmdConfig(rest);
+    break;
   case 'path':
     console.log(ROOT);
     break;
@@ -882,6 +1270,12 @@ switch (command) {
   devhub ports [kill id] lihat / matikan port
   devhub git [path] ...  status|pull|push|commit
   devhub download <url>  download video/audio
+  devhub backup [list|create|restore|delete]  backup project + database
+  devhub clean [--scan|--yes]  hapus node_modules/build di scanRoots
+  devhub actions [nama]  jalankan migrate/test/build project
+  devhub jobs [cancel <id>]  antrian job background
+  devhub config [show|path|edit]  config DevHub
+  devhub lan [on|off|status]  akses dashboard dari perangkat lain (password)
   devhub status          status layanan
   devhub autostart [on|off|status]  nyala otomatis saat login`);
 }
